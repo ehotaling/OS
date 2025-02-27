@@ -21,28 +21,30 @@ public class OS {
 
 
 
-    // For switching to the Kernal
     private static void startTheKernel() {
-        // Can only have one kernel
-        System.out.println("OS.startTheKernel: Starting kernel initiation sequence."); // Debug print
+        System.out.println("OS.startTheKernel: Starting kernel initiation sequence.");
         if (!ki.thread.isAlive()) {
-            System.out.println("OS.startTheKernel: Kernel thread is not alive, starting kernel thread."); // Debug print
+            System.out.println("OS.startTheKernel: Kernel thread is not alive, starting kernel thread.");
             ki.thread.start();
         } else {
-            System.out.println("OS.startTheKernel: Kernel thread is already alive."); // Debug print
+            System.out.println("OS.startTheKernel: Kernel thread is already alive.");
         }
-        System.out.println("OS.startTheKernel: Starting kernel instance."); // Debug print
-        ki.start();
-        // If the scheduler has a currentlyRunning process, stop it.
+        if (OS.currentCall != null) {
+            System.out.println("OS.startTheKernel: Starting kernel instance for system call: " + OS.currentCall);
+            ki.start();
+        }
         Scheduler scheduler = ki.getScheduler();
         if (scheduler.hasRunningProcess()) {
-            System.out.println("OS.startTheKernel: Stopping running process: " + scheduler.runningProcess.userlandProcess.getClass().getSimpleName()); // Debug print
+            System.out.println("OS.startTheKernel: Stopping running process: " + scheduler.runningProcess.userlandProcess.getClass().getSimpleName());
             scheduler.runningProcess.stop();
         } else {
-            System.out.println("OS.startTheKernel: No running process to stop."); // Debug print
+            System.out.println("OS.startTheKernel: No running process to stop.");
         }
-        System.out.println("OS.startTheKernel: Kernel start sequence complete."); // Debug print
+        System.out.println("OS.startTheKernel: Kernel start sequence complete.");
+        // Clear currentCall if it isn’t CreateProcess so waiting loops in CreateProcess aren’t affected.
     }
+
+
 
 
     public static void switchProcess() {
@@ -54,15 +56,28 @@ public class OS {
     }
 
     public static void Startup(UserlandProcess init) throws InterruptedException {
-        System.out.println("OS.Startup: OS Startup initiated."); // Debug print
-        System.out.println("OS.Startup: Initializing Kernel..."); // Debug print
+        System.out.println("OS.Startup: OS Startup initiated.");
+        System.out.println("OS.Startup: Initializing Kernel...");
         ki = new Kernel();
-        System.out.println("OS.Startup: Kernel initialized."); // Debug print
-        System.out.println("OS.Startup: Creating InitProcess..."); // Debug print
+        System.out.println("OS.Startup: Kernel initialized.");
+
+        // Create the idle process first.
+        System.out.println("OS.Startup: Creating IdleProcess...");
+        int idleProcessPID = CreateProcess(new IdleProcess(), PriorityType.background);
+        System.out.println("OS.Startup: CreateProcess for IdleProcess returned PID: " + idleProcessPID);
+        if (idleProcessPID == -1) {
+            System.err.println("OS.Startup: ERROR! CreateProcess for IdleProcess failed!");
+        }
+        System.out.println("OS.Startup: IdleProcess creation requested.");
+
+        // Then create the init process.
+        System.out.println("OS.Startup: Creating InitProcess...");
         CreateProcess(init, PriorityType.interactive);
-        // CreateProcess(new IdleProcess(), PriorityType.background); A dedicated PCB is created in Schedulers constructor
-        System.out.println("OS.Startup: InitProcess creation requested."); // Debug print
+        System.out.println("OS.Startup: InitProcess creation requested.");
+
+
     }
+
 
     public enum PriorityType {realtime, interactive, background}
 
@@ -83,13 +98,7 @@ public class OS {
         // Ensures that Startup() waits for the kernel to complete the system call before returning.
         int waitCounter = 0;
         while (OS.retVal == null) {
-            System.out.println("OS.CreateProcess: Waiting for retVal... waitCounter = " + waitCounter); // Debug print
             Thread.sleep(10);
-            waitCounter++;
-            if (waitCounter > 500) { // Added a timeout in case of infinite loop
-                System.out.println("OS.CreateProcess: Timeout waiting for retVal. Breaking loop."); // Debug print
-                break; // Break out after waiting for 5 seconds (500 * 10ms)
-            }
         }
         System.out.println("OS.CreateProcess: retVal received: " + OS.retVal); // Debug print
         int result = (OS.retVal != null) ? (int) retVal : -1; // Handle potential null retVal after timeout
@@ -102,7 +111,15 @@ public class OS {
         parameters.clear();
         currentCall = CallType.GetPID;
         startTheKernel();
-        return (int) retVal;
+
+        while (retVal == null) {
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException _) {}
+        }
+        int pid = (int) retVal;
+        retVal = null;
+        return pid;
     }
 
     public static void Exit() {

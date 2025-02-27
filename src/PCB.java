@@ -60,20 +60,23 @@ public class PCB { // Process Control Block
 
     // calls userlandProcess’ stop. Loops with Thread.sleep() until ulp.isStopped() is true.
     public void stop() {
-        System.out.println("PCB.stop: Stopping process: " + userlandProcess.getClass().getSimpleName() + ", PID: " + pid); // Debug print
+        System.out.println("PCB.stop: Stopping process: " + userlandProcess.getClass().getSimpleName() + ", PID: " + pid);
         while (!userlandProcess.isStopped()) {
+            if (userlandProcess.isDone()) {  // If finished, break immediately.
+                break;
+            }
             try {
                 userlandProcess.stop();
-                Thread.sleep(10); // To avoid clogging up resources
+                Thread.sleep(10);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
         }
-        System.out.println("PCB.stop: Process stopped: " + userlandProcess.getClass().getSimpleName() + ", PID: " + pid); // Debug print
-
+        System.out.println("PCB.stop: Process stopped: " + userlandProcess.getClass().getSimpleName() + ", PID: " + pid);
     }
 
-    // calls userlandprocess’ isDone() //
+
+    // calls userlandprocess’ isDone()
     public boolean isDone() {
         return userlandProcess.isDone();
     }
