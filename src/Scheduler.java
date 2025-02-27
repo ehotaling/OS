@@ -1,15 +1,14 @@
 import java.util.*;
 
-// Has list of processes, a timer and tracks the currently running process
+// Has priority queues of processes, a timer and tracks the currently running process
 public class Scheduler {
 
-    // hold the list of process that the scheduler knows about
-    private LinkedList<PCB> pcbs = new LinkedList<>();
     // Separate queues for each priority
     private LinkedList<PCB> realTimeQueue = new LinkedList<>();
     private LinkedList<PCB> interactiveQueue = new LinkedList<>();
     private LinkedList<PCB> backgroundQueue = new LinkedList<>();
     private PriorityQueue<SleepingProcesses> sleepingProcesses;
+    private final PCB idlePCB;
 
     private static class SleepingProcesses {
         PCB process;
@@ -31,22 +30,28 @@ public class Scheduler {
 
 
     public Scheduler() {
+        idlePCB = new PCB(idleProcess, OS.PriorityType.background);
+        backgroundQueue.add(idlePCB);
         sleepingProcesses = new PriorityQueue<>(Comparator.comparingLong(s -> s.wakeUpTime));
         // Schedule (using the timer) the interrupt for every 250ms.
         TimerTask interrupt = new TimerTask() {
             public void run() {
                 if (runningProcess != null) {
-                    // If running process did not cooperate and ran until timer ran out increment the timeout counter
+                    // If the running process is the idle process, do nothing.
+                    if (runningProcess == idlePCB) {
+                        return;
+                    }
                     if (!runningProcess.userlandProcess.isExpired) {
                         runningProcess.incrementTimeoutCount();
                     } else {
-                        runningProcess.resetTimeoutCount(); // Process cooperated, so reset timeout counter
+                        runningProcess.resetTimeoutCount();
                     }
                     runningProcess.requestStop();
                 }
             }
         };
         timer.schedule(interrupt, 0, 250);
+
     }
     
 
@@ -86,32 +91,49 @@ public class Scheduler {
 
         // Select next process based on probability function
         runningProcess = selectProcess();
+        if (runningProcess == idlePCB) {
+            backgroundQueue.add(idlePCB);
+        }
     }
+
 
     // Uses probability to select next process to ensure fairness.
     private PCB selectProcess() {
         boolean realTimeProcessExists = !realTimeQueue.isEmpty();
         boolean interactiveProcessExists = !interactiveQueue.isEmpty();
+        boolean backgroundProcessExists = !backgroundQueue.isEmpty();
         Random random = new Random();
         double randomDouble = random.nextDouble();
 
         if (realTimeProcessExists) {
             if (randomDouble < 0.6) {
                 return realTimeQueue.poll();
-            } else if (interactiveProcessExists) {
-                    if (randomDouble < 0.9) {
-                        return interactiveQueue.poll();
-                    } else return backgroundQueue.poll();
+            } else if (interactiveProcessExists && randomDouble < 0.9) {
+                return interactiveQueue.poll();
+            } else if (backgroundProcessExists) {
+                return backgroundQueue.poll();
+            } else {
+                return realTimeQueue.poll(); // Default to realtime if nothing else available
             }
         }
 
         if (interactiveProcessExists) {
             if (randomDouble < 0.75) {
                 return interactiveQueue.poll();
-            } else return backgroundQueue.poll();
+            } else if (backgroundProcessExists) {
+                return backgroundQueue.poll();
+            } else {
+                return interactiveQueue.poll(); // Default to interactive if nothing else
+            }
         }
 
-        return backgroundQueue.poll();
+        if (backgroundProcessExists) {
+            return backgroundQueue.poll();
+        }
+
+        // If all queues are empty, return idlePCB
+        // Make sure idlePCB is always added back to backgroundQueue after use
+        return idlePCB;
     }
 
     // If processes wakeup time has arrived, remove from sleeping processes queue and return them to correct priority queue.

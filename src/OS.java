@@ -43,9 +43,9 @@ public class OS {
     }
 
     public static void Startup(UserlandProcess init) throws InterruptedException {
-            ki = new Kernel();
-            CreateProcess(init, PriorityType.interactive);
-            CreateProcess(new IdleProcess(), PriorityType.background);
+        ki = new Kernel();
+        CreateProcess(init, PriorityType.interactive);
+        // CreateProcess(new IdleProcess(), PriorityType.background); A dedicated PCB is created in Schedulers constructor
     }
 
     public enum PriorityType {realtime, interactive, background}
@@ -54,7 +54,6 @@ public class OS {
         return CreateProcess(up,PriorityType.interactive);
     }
 
-    // For assignment 1, you can ignore the priority. We will use that in assignment 2
 
     public static int CreateProcess(UserlandProcess up, PriorityType priority) throws InterruptedException {
         parameters.clear();

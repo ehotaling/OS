@@ -14,7 +14,9 @@ public class PCB { // Process Control Block
         pid = nextPid++; // Process gets a pid, next process gets the next pid up
         this.userlandProcess = up;
         this.priority = priority;
-        up.thread.start();
+        if (!up.thread.isAlive()) {
+            up.thread.start();
+        }
     }
 
     // increments timeout count if process doesn't cooperate
@@ -31,6 +33,7 @@ public class PCB { // Process Control Block
         } else if (priority == OS.PriorityType.interactive) {
             priority = OS.PriorityType.background;
         }
+        System.out.println("Process with PID " + pid + " demoted to " + priority);
     }
 
     public void resetTimeoutCount() {

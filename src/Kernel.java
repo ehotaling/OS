@@ -8,16 +8,18 @@ public class Kernel extends Process  { // Kernel extends Process because it is a
 
     @Override
     public void main() {
-            while (true) { // Warning on infinite loop is OK...
+        while (true) { // Warning on infinite loop is OK...
+            // If there is a pending system call, process it
+            if (!OS.parameters.isEmpty()) {
+
                 switch (OS.currentCall) { // get a job from OS, do it
                     case CreateProcess ->  // Note how we get parameters from OS and set the return value
                             OS.retVal = CreateProcess((UserlandProcess) OS.parameters.get(0), (OS.PriorityType) OS.parameters.get(1));
                     case SwitchProcess -> SwitchProcess();
                     case Sleep -> Sleep((int) OS.parameters.get(0));
-                    /*
-                    // Priority Scheduler
                     case GetPID -> OS.retVal = GetPid();
                     case Exit -> Exit();
+                    /*
                     // Devices
                     case Open ->
                     case Close ->
@@ -34,11 +36,15 @@ public class Kernel extends Process  { // Kernel extends Process because it is a
                     case FreeMemory ->
                      */
                 }
-                // TODO: Now that we have done the work asked of us, start some process then go to sleep.
-                scheduler.runningProcess.start(); // calls start() on the next process to run
-                this.stop(); // Calls stop() on self, so that only one process is running
-
+                OS.parameters.clear();
+                OS.currentCall = null;
             }
+            // Now that we have done the work asked of us, start some process then go to sleep.
+            if (scheduler.runningProcess != null) {
+                scheduler.runningProcess.start(); // calls start() on the next process to run
+            }
+            this.stop(); // Calls stop() on self, so that only one process is running
+        }
     }
 
     private void SwitchProcess() {
