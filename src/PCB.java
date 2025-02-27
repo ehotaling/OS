@@ -11,12 +11,18 @@ public class PCB { // Process Control Block
 
     // Package private constructor, only kernel should manage PCB's
     PCB(UserlandProcess up, OS.PriorityType priority) {
+        System.out.println("PCB: Creating PCB for process: " + up.getClass().getSimpleName() + ", priority: " + priority + ", PID: " + nextPid); // Debug print
         pid = nextPid++; // Process gets a pid, next process gets the next pid up
         this.userlandProcess = up;
         this.priority = priority;
         if (!up.thread.isAlive()) {
+            System.out.println("PCB: Process thread is not alive, starting thread for: " + up.getClass().getSimpleName() + ", PID: " + pid); // Debug print
             up.thread.start();
+            System.out.println("PCB: Thread started for: " + up.getClass().getSimpleName() + ", PID: " + pid); // Debug print
+        } else {
+            System.out.println("PCB: Process thread is already alive for: " + up.getClass().getSimpleName() + ", PID: " + pid); // Debug print
         }
+        System.out.println("PCB: PCB created for: " + up.getClass().getSimpleName() + ", PID: " + pid); // Debug print
     }
 
     // increments timeout count if process doesn't cooperate
@@ -54,6 +60,7 @@ public class PCB { // Process Control Block
 
     // calls userlandProcess’ stop. Loops with Thread.sleep() until ulp.isStopped() is true.
     public void stop() {
+        System.out.println("PCB.stop: Stopping process: " + userlandProcess.getClass().getSimpleName() + ", PID: " + pid); // Debug print
         while (!userlandProcess.isStopped()) {
             try {
                 userlandProcess.stop();
@@ -62,6 +69,7 @@ public class PCB { // Process Control Block
                 e.printStackTrace();
             }
         }
+        System.out.println("PCB.stop: Process stopped: " + userlandProcess.getClass().getSimpleName() + ", PID: " + pid); // Debug print
 
     }
 
@@ -72,6 +80,7 @@ public class PCB { // Process Control Block
 
     // calls userlandprocess’ start() //
     void start() {
+        System.out.println("PCB.start: Starting process: " + userlandProcess.getClass().getSimpleName() + ", PID: " + pid); // Debug print
         userlandProcess.start();
     }
 

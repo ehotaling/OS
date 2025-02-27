@@ -9,7 +9,6 @@ public class Scheduler {
     private LinkedList<PCB> backgroundQueue = new LinkedList<>();
     private PriorityQueue<SleepingProcesses> sleepingProcesses;
     private final PCB idlePCB;
-    private final Random random = new Random();
 
     private static class SleepingProcesses {
         PCB process;
@@ -31,6 +30,7 @@ public class Scheduler {
 
 
     public Scheduler() {
+        System.out.println("Scheduler: Scheduler constructor called."); // Debug print
         idlePCB = new PCB(idleProcess, OS.PriorityType.background);
         backgroundQueue.add(idlePCB);
         sleepingProcesses = new PriorityQueue<>(Comparator.comparingLong(s -> s.wakeUpTime));
@@ -55,21 +55,25 @@ public class Scheduler {
             }
         };
         timer.schedule(interrupt, 0, 250);
+        System.out.println("Scheduler: Timer task scheduled."); // Debug print
 
     }
-    
+
 
     // Adds process to list, calls switchProcess if necessary, returns pid of userland process
     public int createProcess(UserlandProcess up, OS.PriorityType p) {
         // create a PCB for the userland process
         PCB userlandProcess = new PCB(up, p);
+        System.out.println("Scheduler.createProcess: Creating process of type: " + up.getClass().getSimpleName() + ", priority: " + p); // Debug print
         switch (p) {
             case realtime -> this.realTimeQueue.add(userlandProcess);
             case interactive -> this.interactiveQueue.add(userlandProcess);
             case background -> this.backgroundQueue.add(userlandProcess);
         }
+        System.out.println("Scheduler.createProcess: Process " + up.getClass().getSimpleName() + " created with PID: " + userlandProcess.pid); // Debug print
         // If nothing else is running, call switchProcess() to get it started.
         if (runningProcess == null) {
+            System.out.println("Scheduler.createProcess: No running process, calling switchProcess."); // Debug print
             switchProcess();
         }
         return userlandProcess.pid;
@@ -79,10 +83,12 @@ public class Scheduler {
     // Move sleeping processes whose wakeup time has been reached back into their priority queue.
     // Choose next process to run using probability.
     public void switchProcess() {
+        System.out.println("Scheduler.switchProcess: Starting process switch."); // Debug print
         // Check sleeping processes, move eligible ones back into their correct priority queue
         WakeupProcesses();
         // If there is a process currently running, and it's not done, add it to the end of its priority queue.
         if (runningProcess != null && !runningProcess.isDone()) {
+            System.out.println("Scheduler.switchProcess: Adding running process back to queue: " + runningProcess.userlandProcess.getClass().getSimpleName() + ", Priority: " + runningProcess.getPriority()); // Debug print
             switch (runningProcess.getPriority()) {
                 case realtime -> realTimeQueue.add(runningProcess);
                 case interactive -> interactiveQueue.add(runningProcess);
@@ -94,10 +100,14 @@ public class Scheduler {
         WakeupProcesses();
 
         // Select next process based on probability function
+        System.out.println("Scheduler.switchProcess: Selecting next process."); // Debug print
         runningProcess = selectProcess();
+        System.out.println("Scheduler.switchProcess: Selected process: " + (runningProcess != null ? runningProcess.userlandProcess.getClass().getSimpleName() : "null")); // Debug print
         if (runningProcess == idlePCB) {
+            System.out.println("Scheduler.switchProcess: Selected idle process, adding back to background queue."); // Debug print
             backgroundQueue.add(idlePCB);
         }
+        System.out.println("Scheduler.switchProcess: Process switch complete."); // Debug print
     }
 
 
@@ -106,36 +116,57 @@ public class Scheduler {
         boolean realTimeProcessExists = !realTimeQueue.isEmpty();
         boolean interactiveProcessExists = !interactiveQueue.isEmpty();
         boolean backgroundProcessExists = !backgroundQueue.isEmpty();
+        Random random = new Random();
         double randomDouble = random.nextDouble();
 
         if (realTimeProcessExists) {
+            System.out.println("Scheduler.selectProcess: Realtime queue not empty."); // Debug print
             if (randomDouble < 0.6) {
-                return realTimeQueue.poll();
+                PCB selectedProcess = realTimeQueue.poll();
+                System.out.println("Scheduler.selectProcess: Selected realtime process: " + selectedProcess.userlandProcess.getClass().getSimpleName()); // Debug print
+                return selectedProcess;
             } else if (interactiveProcessExists && randomDouble < 0.9) {
-                return interactiveQueue.poll();
+                PCB selectedProcess = interactiveQueue.poll();
+                System.out.println("Scheduler.selectProcess: Selected interactive process: " + selectedProcess.userlandProcess.getClass().getSimpleName()); // Debug print
+                return selectedProcess;
             } else if (backgroundProcessExists) {
-                return backgroundQueue.poll();
+                PCB selectedProcess = backgroundQueue.poll();
+                System.out.println("Scheduler.selectProcess: Selected background process: " + selectedProcess.userlandProcess.getClass().getSimpleName()); // Debug print
+                return selectedProcess;
             } else {
-                return realTimeQueue.poll(); // Default to realtime if nothing else available
+                PCB selectedProcess = realTimeQueue.poll();
+                System.out.println("Scheduler.selectProcess: Selected realtime process (default): " + selectedProcess.userlandProcess.getClass().getSimpleName()); // Debug print
+                return selectedProcess; // Default to realtime if nothing else available
             }
         }
 
         if (interactiveProcessExists) {
+            System.out.println("Scheduler.selectProcess: Interactive queue not empty."); // Debug print
             if (randomDouble < 0.75) {
-                return interactiveQueue.poll();
+                PCB selectedProcess = interactiveQueue.poll();
+                System.out.println("Scheduler.selectProcess: Selected interactive process: " + selectedProcess.userlandProcess.getClass().getSimpleName()); // Debug print
+                return selectedProcess;
             } else if (backgroundProcessExists) {
-                return backgroundQueue.poll();
+                PCB selectedProcess = backgroundQueue.poll();
+                System.out.println("Scheduler.selectProcess: Selected background process: " + selectedProcess.userlandProcess.getClass().getSimpleName()); // Debug print
+                return selectedProcess;
             } else {
-                return interactiveQueue.poll(); // Default to interactive if nothing else
+                PCB selectedProcess = interactiveQueue.poll();
+                System.out.println("Scheduler.selectProcess: Selected interactive process (default): " + selectedProcess.userlandProcess.getClass().getSimpleName()); // Debug print
+                return selectedProcess; // Default to interactive if nothing else
             }
         }
 
         if (backgroundProcessExists) {
-            return backgroundQueue.poll();
+            System.out.println("Scheduler.selectProcess: Background queue not empty."); // Debug print
+            PCB selectedProcess = backgroundQueue.poll();
+            System.out.println("Scheduler.selectProcess: Selected background process: " + selectedProcess.userlandProcess.getClass().getSimpleName()); // Debug print
+            return selectedProcess;
         }
 
         // If all queues are empty, return idlePCB
         // Make sure idlePCB is always added back to backgroundQueue after use
+        System.out.println("Scheduler.selectProcess: All queues empty, selecting idle process."); // Debug print
         return idlePCB;
     }
 

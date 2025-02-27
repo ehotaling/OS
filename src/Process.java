@@ -12,10 +12,12 @@ public abstract class Process implements Runnable{
 
 
     public Process() {
+        System.out.println("Process: Process constructor for: " + this.getClass().getSimpleName()); // Debug print
     }
 
     // sets the boolean indicating that this process’ quantum has expired
     public void requestStop() {
+        System.out.println("Process.requestStop: Request stop for process: " + this.getClass().getSimpleName()); // Debug print
         isExpired = true;
     }
 
@@ -34,29 +36,45 @@ public abstract class Process implements Runnable{
 
     // releases (increments) the semaphore, allowing this thread to run
     public void start() {
+        System.out.println("Process.start: Starting process: " + this.getClass().getSimpleName()); // Debug print
         available.release();
+        System.out.println("Process.start: Semaphore released for process: " + this.getClass().getSimpleName() + ", permits: " + available.availablePermits()); // Debug print
     }
 
     // acquires (decrements) the semaphore, stopping this thread from running
     public void stop() {
+        // System.out.println("Process.stop: Stopping process: " + this.getClass().getSimpleName()); // Debug print
         available.acquireUninterruptibly();
+        System.out.println("Process.stop: Semaphore acquired for process: " + this.getClass().getSimpleName() + ", permits: " + available.availablePermits()); // Debug print
     }
 
     // acquire the semaphore, then call main
     public void run() { // This is called by the Thread - NEVER CALL THIS!!!
+        System.out.println("Process.run: Run method invoked for process: " + this.getClass().getSimpleName()); // Debug print
+//        available.drainPermits(); // Reset permits to 0 at the start of each run
         try {
-            available.acquire();
-            main();
+            while (true) {
+                available.drainPermits();
+                System.out.println("Process.run: Attempting to acquire semaphore for: " + this.getClass().getSimpleName() + ", permits: " + available.availablePermits()); // Debug print
+                available.acquire(); // Wait for scheduler to release one permit
+                main();            // Execute one scheduling quantum of work
+                System.out.println("Process.run: Semaphore acquired for: " + this.getClass().getSimpleName() + ", permits: " + available.availablePermits()); // Debug print
+            }
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
+        } finally {
+            System.out.println("Process.run: Run method finished for process: " + this.getClass().getSimpleName()); // Debug print
         }
     }
 
     // if the boolean is true, set the boolean to false and call OS.switchProcess(), reset timeout counter if process cooperates
     public void cooperate() {
         if (isExpired) {
+            System.out.println("Process.cooperate: Process " + this.getClass().getSimpleName() + " is expired, switching process."); // Debug print
             isExpired = false;
             OS.switchProcess();
+        } else {
+            System.out.println("Process.cooperate: Process " + this.getClass().getSimpleName() + " cooperating."); // Debug print
         }
     }
 }

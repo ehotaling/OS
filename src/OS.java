@@ -24,28 +24,44 @@ public class OS {
     // For switching to the Kernal
     private static void startTheKernel() {
         // Can only have one kernel
+        System.out.println("OS.startTheKernel: Starting kernel initiation sequence."); // Debug print
         if (!ki.thread.isAlive()) {
+            System.out.println("OS.startTheKernel: Kernel thread is not alive, starting kernel thread."); // Debug print
             ki.thread.start();
+        } else {
+            System.out.println("OS.startTheKernel: Kernel thread is already alive."); // Debug print
         }
+        System.out.println("OS.startTheKernel: Starting kernel instance."); // Debug print
         ki.start();
         // If the scheduler has a currentlyRunning process, stop it.
         Scheduler scheduler = ki.getScheduler();
         if (scheduler.hasRunningProcess()) {
+            System.out.println("OS.startTheKernel: Stopping running process: " + scheduler.runningProcess.userlandProcess.getClass().getSimpleName()); // Debug print
             scheduler.runningProcess.stop();
+        } else {
+            System.out.println("OS.startTheKernel: No running process to stop."); // Debug print
         }
+        System.out.println("OS.startTheKernel: Kernel start sequence complete."); // Debug print
     }
 
 
     public static void switchProcess() {
+        System.out.println("OS.switchProcess: Switch process requested."); // Debug print
         parameters.clear();
         currentCall = CallType.SwitchProcess;
         startTheKernel();
+        System.out.println("OS.switchProcess: startTheKernel() returned."); // Debug print
     }
 
     public static void Startup(UserlandProcess init) throws InterruptedException {
+        System.out.println("OS.Startup: OS Startup initiated."); // Debug print
+        System.out.println("OS.Startup: Initializing Kernel..."); // Debug print
         ki = new Kernel();
+        System.out.println("OS.Startup: Kernel initialized."); // Debug print
+        System.out.println("OS.Startup: Creating InitProcess..."); // Debug print
         CreateProcess(init, PriorityType.interactive);
         // CreateProcess(new IdleProcess(), PriorityType.background); A dedicated PCB is created in Schedulers constructor
+        System.out.println("OS.Startup: InitProcess creation requested."); // Debug print
     }
 
     public enum PriorityType {realtime, interactive, background}
@@ -56,38 +72,45 @@ public class OS {
 
 
     public static int CreateProcess(UserlandProcess up, PriorityType priority) throws InterruptedException {
+        System.out.println("OS.CreateProcess: Request to create process of type: " + up.getClass().getSimpleName() + ", priority: " + priority); // Debug print
         parameters.clear();
         parameters.add(up);
         parameters.add(priority);
         currentCall = CallType.CreateProcess;
+        System.out.println("OS.CreateProcess: Calling startTheKernel()."); // Debug print
         startTheKernel();
+        System.out.println("OS.CreateProcess: startTheKernel() returned, waiting for retVal."); // Debug print
         // Ensures that Startup() waits for the kernel to complete the system call before returning.
+        int waitCounter = 0;
         while (OS.retVal == null) {
+            System.out.println("OS.CreateProcess: Waiting for retVal... waitCounter = " + waitCounter); // Debug print
             Thread.sleep(10);
+            waitCounter++;
+            if (waitCounter > 500) { // Added a timeout in case of infinite loop
+                System.out.println("OS.CreateProcess: Timeout waiting for retVal. Breaking loop."); // Debug print
+                break; // Break out after waiting for 5 seconds (500 * 10ms)
+            }
         }
-        return (int) retVal;
+        System.out.println("OS.CreateProcess: retVal received: " + OS.retVal); // Debug print
+        int result = (OS.retVal != null) ? (int) retVal : -1; // Handle potential null retVal after timeout
+        OS.retVal = null; // Reset retVal for next syscall
+        System.out.println("OS.CreateProcess: Returning PID: " + result); // Debug print
+        return result;
     }
 
     public static int GetPID() {
         parameters.clear();
         currentCall = CallType.GetPID;
         startTheKernel();
-        // Wait until the kernel has processed the call.
-        while (retVal == null) {
-            try {
-                Thread.sleep(10);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-        }
         return (int) retVal;
     }
 
-
     public static void Exit() {
+        System.out.println("OS.Exit: Exit system call requested."); // Debug print
         parameters.clear();
         currentCall = CallType.Exit;
         startTheKernel();
+        System.out.println("OS.Exit: startTheKernel() returned."); // Debug print
     }
 
     public static void Sleep(int mills) {
