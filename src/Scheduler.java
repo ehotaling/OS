@@ -9,6 +9,7 @@ public class Scheduler {
     private LinkedList<PCB> backgroundQueue = new LinkedList<>();
     private PriorityQueue<SleepingProcesses> sleepingProcesses;
     private final PCB idlePCB;
+    private final Random random = new Random();
 
     private static class SleepingProcesses {
         PCB process;
@@ -36,6 +37,9 @@ public class Scheduler {
         // Schedule (using the timer) the interrupt for every 250ms.
         TimerTask interrupt = new TimerTask() {
             public void run() {
+                if (runningProcess == idlePCB) {
+                    return;
+                }
                 if (runningProcess != null) {
                     // If the running process is the idle process, do nothing.
                     if (runningProcess == idlePCB) {
@@ -102,7 +106,6 @@ public class Scheduler {
         boolean realTimeProcessExists = !realTimeQueue.isEmpty();
         boolean interactiveProcessExists = !interactiveQueue.isEmpty();
         boolean backgroundProcessExists = !backgroundQueue.isEmpty();
-        Random random = new Random();
         double randomDouble = random.nextDouble();
 
         if (realTimeProcessExists) {

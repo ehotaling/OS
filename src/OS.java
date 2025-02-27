@@ -72,8 +72,17 @@ public class OS {
         parameters.clear();
         currentCall = CallType.GetPID;
         startTheKernel();
+        // Wait until the kernel has processed the call.
+        while (retVal == null) {
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
         return (int) retVal;
     }
+
 
     public static void Exit() {
         parameters.clear();

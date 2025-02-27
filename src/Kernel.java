@@ -4,21 +4,42 @@ public class Kernel extends Process  { // Kernel extends Process because it is a
     private final Scheduler scheduler = new Scheduler();
 
     public Kernel() {
+        System.out.println("Kernel: Kernel constructor called."); // Debug print
     }
 
     @Override
     public void main() {
-        while (true) { // Warning on infinite loop is OK...
-            // If there is a pending system call, process it
+        System.out.println("Kernel.main: Kernel main loop started."); // Debug print
+        while (true) {
+            // Process system calls
             if (!OS.parameters.isEmpty()) {
-
+                System.out.println("Kernel.main: Processing system call: " + OS.currentCall); // Debug print
                 switch (OS.currentCall) { // get a job from OS, do it
-                    case CreateProcess ->  // Note how we get parameters from OS and set the return value
-                            OS.retVal = CreateProcess((UserlandProcess) OS.parameters.get(0), (OS.PriorityType) OS.parameters.get(1));
-                    case SwitchProcess -> SwitchProcess();
-                    case Sleep -> Sleep((int) OS.parameters.get(0));
-                    case GetPID -> OS.retVal = GetPid();
-                    case Exit -> Exit();
+                    case CreateProcess -> {// Note how we get parameters from OS and set the return value
+                        System.out.println("Kernel.main: System call is CreateProcess."); // Debug print
+                        OS.retVal = CreateProcess((UserlandProcess) OS.parameters.get(0), (OS.PriorityType) OS.parameters.get(1));
+                        System.out.println("Kernel.main: CreateProcess call finished, retVal set: " + OS.retVal); // Debug print
+                    }
+                    case SwitchProcess -> {
+                        System.out.println("Kernel.main: System call is SwitchProcess."); // Debug print
+                        SwitchProcess();
+                        System.out.println("Kernel.main: SwitchProcess call finished."); // Debug print
+                    }
+                    case Sleep -> {
+                        System.out.println("Kernel.main: System call is Sleep."); // Debug print
+                        Sleep((int) OS.parameters.get(0));
+                        System.out.println("Kernel.main: Sleep call finished."); // Debug print
+                    }
+                    case GetPID -> {
+                        System.out.println("Kernel.main: System call is GetPID."); // Debug print
+                        OS.retVal = GetPid();
+                        System.out.println("Kernel.main: GetPID call finished, retVal set: " + OS.retVal); // Debug print
+                    }
+                    case Exit -> {
+                        System.out.println("Kernel.main: System call is Exit."); // Debug print
+                        Exit();
+                        System.out.println("Kernel.main: Exit call finished."); // Debug print
+                    }
                     /*
                     // Devices
                     case Open ->
@@ -38,11 +59,16 @@ public class Kernel extends Process  { // Kernel extends Process because it is a
                 }
                 OS.parameters.clear();
                 OS.currentCall = null;
+                System.out.println("Kernel.main: System call processed, parameters cleared, currentCall reset."); // Debug print
             }
+            // Always switch to the next process before starting it
+            scheduler.switchProcess();
             // Now that we have done the work asked of us, start some process then go to sleep.
-            if (scheduler.runningProcess != null) {
-                scheduler.runningProcess.start(); // calls start() on the next process to run
+            while (scheduler.runningProcess == null) {
+                scheduler.switchProcess(); // Keep switching until valid process is found
             }
+            // Start the scheduled process
+            scheduler.runningProcess.start();
             this.stop(); // Calls stop() on self, so that only one process is running
         }
     }
@@ -51,7 +77,6 @@ public class Kernel extends Process  { // Kernel extends Process because it is a
         scheduler.switchProcess();
     }
 
-    // For assignment 1, you can ignore the priority. We will use that in assignment 2
 
     // Calls the scheduler’s version of CreateProcess
     private int CreateProcess(UserlandProcess up, OS.PriorityType priority) {
