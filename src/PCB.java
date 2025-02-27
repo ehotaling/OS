@@ -2,9 +2,12 @@
 
 public class PCB { // Process Control Block
     private static int nextPid = 1;
-    private final UserlandProcess userlandProcess;
+    public final UserlandProcess userlandProcess;
     public int pid;
     private OS.PriorityType priority;
+    private int timeoutCount = 0; // tracks consecutive timeouts
+    public long wakeupTime = 0;
+
 
     // Package private constructor, only kernel should manage PCB's
     PCB(UserlandProcess up, OS.PriorityType priority) {
@@ -12,6 +15,26 @@ public class PCB { // Process Control Block
         this.userlandProcess = up;
         this.priority = priority;
         up.thread.start();
+    }
+
+    // increments timeout count if process doesn't cooperate
+    public void incrementTimeoutCount() {
+        timeoutCount++;
+        if (timeoutCount > 5) { // if process times out more than 5 times in a row
+            demotePriority();
+        }
+    }
+
+    private void demotePriority() {
+        if (priority == OS.PriorityType.realtime) {
+            priority = OS.PriorityType.interactive;
+        } else if (priority == OS.PriorityType.interactive) {
+            priority = OS.PriorityType.background;
+        }
+    }
+
+    public void resetTimeoutCount() {
+        timeoutCount = 0;
     }
 
     public String getName() {
@@ -52,4 +75,5 @@ public class PCB { // Process Control Block
     public void setPriority(OS.PriorityType newPriority) {
         priority = newPriority;
     }
+
 }

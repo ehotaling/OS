@@ -13,9 +13,9 @@ public class Kernel extends Process  { // Kernel extends Process because it is a
                     case CreateProcess ->  // Note how we get parameters from OS and set the return value
                             OS.retVal = CreateProcess((UserlandProcess) OS.parameters.get(0), (OS.PriorityType) OS.parameters.get(1));
                     case SwitchProcess -> SwitchProcess();
+                    case Sleep -> Sleep((int) OS.parameters.get(0));
                     /*
                     // Priority Scheduler
-                    case Sleep -> Sleep((int) OS.parameters.get(0));
                     case GetPID -> OS.retVal = GetPid();
                     case Exit -> Exit();
                     // Devices
@@ -55,13 +55,22 @@ public class Kernel extends Process  { // Kernel extends Process because it is a
     }
 
     private void Sleep(int mills) {
+        scheduler.sleep(mills);
     }
 
+    // Removes process from the scheduler and chooses another process
     private void Exit() {
+        if (scheduler.runningProcess != null) {
+            scheduler.removeProcess(scheduler.runningProcess);
+            scheduler.runningProcess = null;
+            scheduler.switchProcess();
+        }
     }
 
+    // This returns the PID of the currently running process
     private int GetPid() {
-        return 0; // change this
+        OS.retVal = scheduler.runningProcess.pid;
+        return (int) OS.retVal;
     }
 
     private int Open(String s) {

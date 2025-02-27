@@ -52,7 +52,7 @@ public abstract class Process implements Runnable{
         }
     }
 
-    // if the boolean is true, set the boolean to false and call OS.switchProcess()
+    // if the boolean is true, set the boolean to false and call OS.switchProcess(), reset timeout counter if process cooperates
     public void cooperate() {
         if (isExpired) {
             isExpired = false;

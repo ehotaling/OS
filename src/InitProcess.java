@@ -8,11 +8,6 @@ public class InitProcess extends UserlandProcess {
         // Init should create new processes: HelloWorld and GoodbyeWorld.
         OS.CreateProcess(new HelloWorld());
         OS.CreateProcess(new GoodbyeWorld());
-        while (true) {
-            try {
-                cooperate();
-                Thread.sleep(50);
-            } catch (Exception e) { }
-        }
+        OS.Exit();
     }
 }
