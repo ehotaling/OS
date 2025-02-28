@@ -3,6 +3,9 @@ import java.util.List;
 
 // Gateway between the userland thread and the kernel thread.
 public class OS {
+
+    private static boolean initProcessFinished = false;
+
     private static Kernel ki; // The one and only one instance of the kernel.
 
     // A static array list of parameters to the function; we don’t know what they will be, so we will make it
@@ -16,11 +19,17 @@ public class OS {
     // An enum of what function to call
     public enum CallType {SwitchProcess,SendMessage, Open, Close, Read, Seek, Write, GetMapping, CreateProcess, Sleep, GetPID, AllocateMemory, FreeMemory, GetPIDByName, WaitForMessage, Exit}
 
+    public static boolean isInitProcessFinished() {
+        return initProcessFinished;
+    }
+
+    public static void setInitProcessFinished() {
+        System.out.println( "OS.setInitProcessFinished: Setting init process finished.");
+        initProcessFinished = true;
+    }
+
     // A static instance of that enum
     public static CallType currentCall;
-
-
-
     private static void startTheKernel() {
         System.out.println("OS.startTheKernel: Starting kernel initiation sequence.");
         if (!ki.thread.isAlive()) {
@@ -41,7 +50,6 @@ public class OS {
             System.out.println("OS.startTheKernel: No running process to stop.");
         }
         System.out.println("OS.startTheKernel: Kernel start sequence complete.");
-        // Clear currentCall if it isn’t CreateProcess so waiting loops in CreateProcess aren’t affected.
     }
 
 
@@ -66,7 +74,7 @@ public class OS {
         int idleProcessPID = CreateProcess(new IdleProcess(), PriorityType.background);
         System.out.println("OS.Startup: CreateProcess for IdleProcess returned PID: " + idleProcessPID);
         if (idleProcessPID == -1) {
-            System.err.println("OS.Startup: ERROR! CreateProcess for IdleProcess failed!");
+            System.err.println("OS.Startup: Error. CreateProcess for IdleProcess failed.");
         }
         System.out.println("OS.Startup: IdleProcess creation requested.");
 
@@ -75,7 +83,15 @@ public class OS {
         CreateProcess(init, PriorityType.interactive);
         System.out.println("OS.Startup: InitProcess creation requested.");
 
-
+        // Wait for InitProcess to complete before continuing
+        while (!isInitProcessFinished()) {
+            try {
+                Thread.sleep(10); // Give time for InitProcess to complete
+            } catch (InterruptedException e) {
+                System.out.println("OS.Startup: Interrupted while waiting for InitProcess.");
+            }
+        }
+        System.out.println("Main: OS Startup complete.");
     }
 
 
@@ -87,7 +103,7 @@ public class OS {
 
 
     public static int CreateProcess(UserlandProcess up, PriorityType priority) throws InterruptedException {
-        System.out.println("OS.CreateProcess: Request to create process of type: " + up.getClass().getSimpleName() + ", priority: " + priority); // Debug print
+        System.out.println("OS.CreateProcess: Request to create process of name: " + up.getClass().getSimpleName() + ", priority: " + priority); // Debug print
         parameters.clear();
         parameters.add(up);
         parameters.add(priority);
@@ -96,12 +112,11 @@ public class OS {
         startTheKernel();
         System.out.println("OS.CreateProcess: startTheKernel() returned, waiting for retVal."); // Debug print
         // Ensures that Startup() waits for the kernel to complete the system call before returning.
-        int waitCounter = 0;
         while (OS.retVal == null) {
             Thread.sleep(10);
         }
         System.out.println("OS.CreateProcess: retVal received: " + OS.retVal); // Debug print
-        int result = (OS.retVal != null) ? (int) retVal : -1; // Handle potential null retVal after timeout
+        int result = (int) OS.retVal;
         OS.retVal = null; // Reset retVal for next syscall
         System.out.println("OS.CreateProcess: Returning PID: " + result); // Debug print
         return result;

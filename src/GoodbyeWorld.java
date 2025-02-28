@@ -8,7 +8,7 @@ public class GoodbyeWorld extends UserlandProcess {
             try {
                 cooperate();
                 System.out.println("Goodbye world");
-                Thread.sleep(50); // sleep for 50 ms
+                thread.sleep(50);
             } catch (Exception e) {}
         }
     }

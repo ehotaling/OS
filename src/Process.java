@@ -13,6 +13,8 @@ public abstract class Process implements Runnable{
    // flag to indicate termination.
     private boolean terminated = false;
 
+    // Track when current quantum started
+    public long quantumStartTime = System.currentTimeMillis();
 
     public Process() {
         System.out.println("Process: Process constructor for: " + this.getClass().getSimpleName()); // Debug print
@@ -44,9 +46,13 @@ public abstract class Process implements Runnable{
 
     // releases (increments) the semaphore, allowing this thread to run
     public void start() {
-        System.out.println("Process.start: Starting process: " + this.getClass().getSimpleName()); // Debug print
-        available.release();
-        System.out.println("Process.start: Semaphore released for process: " + this.getClass().getSimpleName() + ", permits: " + available.availablePermits()); // Debug print
+        if (available.availablePermits() == 0) {
+            System.out.println("Process.start: Starting process: " + this.getClass().getSimpleName()); // Debug print
+            available.release();
+            System.out.println("Process.start: Semaphore released for process: " +
+                    this.getClass().getSimpleName() + ", permits: " + available.availablePermits()); // Debug print
+        }
+
     }
 
     // acquires (decrements) the semaphore, stopping this thread from running
@@ -69,6 +75,11 @@ public abstract class Process implements Runnable{
         }
     }
 
+    // Reset quantum
+    public void resetQuantum() {
+        quantumStartTime = System.currentTimeMillis();
+    }
+
 
     // The cooperative yield method.
     // When the process's quantum is expired, cooperate() calls OS.switchProcess()
@@ -77,6 +88,7 @@ public abstract class Process implements Runnable{
         if (isExpired) {
             System.out.println("Process.cooperate: Process " + this.getClass().getSimpleName() + " is expired, switching process.");
             isExpired = false;
+            resetQuantum();
             OS.switchProcess();
             // Block until resumed by the scheduler (which calls start() to release one permit).
             available.acquire();

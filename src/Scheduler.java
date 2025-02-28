@@ -1,13 +1,16 @@
 import java.util.*;
 
-// The Scheduler class manages processes based on priority, tracks sleeping processes, and switches tasks using a probabilistic model.
+// The Scheduler class manages processes based on priority, tracks sleeping processes,
+// and switches tasks using a probabilistic model.
 public class Scheduler {
 
     // Separate queues for each priority type
     private LinkedList<PCB> realTimeQueue = new LinkedList<>();
     private LinkedList<PCB> interactiveQueue = new LinkedList<>();
     private LinkedList<PCB> backgroundQueue = new LinkedList<>();
-    private PriorityQueue<SleepingProcesses> sleepingProcesses;
+
+    // PriorityQueue for sleeping processes, ordered by wakeup time
+    private PriorityQueue<Scheduler.SleepingProcesses> sleepingProcesses;
 
     // Private class to track sleeping processes and their wakeup time
     private static class SleepingProcesses {
@@ -26,7 +29,7 @@ public class Scheduler {
     // Reference to the currently running process
     public PCB runningProcess = null;
 
-    // Scheduler constructor initializes sleeping process queue and sets up a periodic timer interrupt.
+    // Scheduler constructor
     public Scheduler() {
         System.out.println("Scheduler: Scheduler constructor called.");
         sleepingProcesses = new PriorityQueue<>(Comparator.comparingLong(s -> s.wakeUpTime));
@@ -37,13 +40,23 @@ public class Scheduler {
                 if (runningProcess == null) {
                     System.out.println("Scheduler.interrupt: No process available.");
                 } else {
-                    // If a process is running, update its timeout tracking and stop it if necessary.
-                    if (!runningProcess.userlandProcess.isExpired) {
-                        runningProcess.incrementTimeoutCount();
+                    // Special case: if the running process is the init process, let it run without timeout penalties.
+                    if (runningProcess.userlandProcess instanceof InitProcess) {
+                        // Just reset its quantum.
+                        runningProcess.userlandProcess.resetQuantum();
                     } else {
-                        runningProcess.resetTimeoutCount();
+                        long elapsed = System.currentTimeMillis() - runningProcess.userlandProcess.quantumStartTime;
+                        if (elapsed >= 250) {
+                            runningProcess.incrementTimeoutCount();
+                            System.out.println("Scheduler.interrupt: Elapsed time = " + elapsed
+                                    + " ms, timeout count = " + runningProcess.getTimeoutCount()
+                                    + " for PID " + runningProcess.pid + ", process: " + runningProcess.userlandProcess.getClass().getSimpleName());
+                            if (runningProcess.getTimeoutCount() > 5) {
+                                demote(runningProcess);
+                            }
+                            runningProcess.requestStop();
+                        }
                     }
-                    runningProcess.requestStop();
                 }
             }
         };
@@ -52,47 +65,47 @@ public class Scheduler {
     }
 
     // Creates a new process and places it in the correct priority queue.
-    // If no process is currently running, it triggers a switch.
+    // If no process is currently running, trigger a switch immediately.
     public int createProcess(UserlandProcess up, OS.PriorityType p) {
         PCB userlandProcess = new PCB(up, p);
         System.out.println("Scheduler.createProcess: Creating process of type: "
-                + up.toString() + ", priority: " + p); // Existing print
+                + up.toString() + ", priority: " + p);
 
-        // Added debug prints START
-        System.out.println("Scheduler.createProcess: Adding process of type: " + up.toString() + " to queue: " + p);
         switch (p) {
             case realtime -> realTimeQueue.add(userlandProcess);
             case interactive -> interactiveQueue.add(userlandProcess);
             case background -> backgroundQueue.add(userlandProcess);
         }
-        System.out.println("Scheduler.createProcess: Process added to queue, process type: " + up.getClass().getSimpleName() + ", queue: " + p);
-        // Added debug prints END
-
-
         System.out.println("Scheduler.createProcess: Process "
-                + up.getClass().getSimpleName() + " created with PID: " + userlandProcess.pid); // Existing print
+                + up.getClass().getSimpleName() + " created with PID: "
+                + userlandProcess.pid);
 
         if (runningProcess == null) {
-            System.out.println("Scheduler.createProcess: No running process, calling switchProcess.");
             switchProcess();
         }
 
-        System.out.println("Scheduler.createProcess: Returning PID: " + userlandProcess.pid); // Existing print
         return userlandProcess.pid;
     }
 
-    // Handles process switching by moving running processes to their respective queues and selecting the next one.
+    // Process switching
     public void switchProcess() {
         System.out.println("Scheduler.switchProcess: Starting process switch.");
 
-        // Check if any sleeping processes are ready to be reactivated.
+
+        // Avoid preempting InitProcess *only if it's still creating processes*
+        if (runningProcess != null && runningProcess.userlandProcess instanceof InitProcess) {
+            InitProcess init = (InitProcess) runningProcess.userlandProcess;
+            if (!OS.isInitProcessFinished()) {  // Add a flag to check if InitProcess is done
+                System.out.println("Scheduler.switchProcess: InitProcess is still running, avoiding preemption.");
+                return; // Init not switched until it is finished
+            }
+        }
+
+        // Check if any sleeping processes are ready to be awakened
         WakeupProcesses();
 
-        // If the running process is still active, move it back to its queue.
+        // If the running process is still active, place it back on its queue
         if (runningProcess != null && !runningProcess.isDone()) {
-            System.out.println("Scheduler.switchProcess: Adding running process back to queue: "
-                    + runningProcess.userlandProcess.getClass().getSimpleName()
-                    + ", Priority: " + runningProcess.getPriority());
             switch (runningProcess.getPriority()) {
                 case realtime -> realTimeQueue.add(runningProcess);
                 case interactive -> interactiveQueue.add(runningProcess);
@@ -100,65 +113,75 @@ public class Scheduler {
             }
         }
 
-        // Select the next process to run based on the probabilistic model.
-        System.out.println("Scheduler.switchProcess: Selecting next process.");
+        // Pick the next process using the probabilistic model
         runningProcess = selectProcess();
 
-        System.out.println("Scheduler.switchProcess: Selected process: "
-                + (runningProcess != null ? runningProcess.userlandProcess.getClass().getSimpleName() : "null"));
+        if (runningProcess != null) {
+            System.out.println("Scheduler.switchProcess: Next process: "
+                    + runningProcess.userlandProcess.getClass().getSimpleName()
+                    + " (PID " + runningProcess.pid + ")");
+        } else {
+            System.out.println("Scheduler.switchProcess: No process selected (all queues empty).");
+        }
 
         System.out.println("Scheduler.switchProcess: Process switch complete.");
     }
 
     private PCB selectProcess() {
+        System.out.println("Scheduler.selectProcess: Selecting next process using probabilistic model.");
         Random random = new Random();
         double randomDouble = random.nextDouble();
-        PCB selectedPCB = null; // Initialize selectedPCB to null
 
-        // realtime queue first
+        // If there is at least one real-time process:
         if (!realTimeQueue.isEmpty()) {
+            // 60% chance to choose a real-time process
             if (randomDouble < 0.6) {
-                selectedPCB = pollNext(realTimeQueue);
-                if (selectedPCB != null) return selectedPCB; // Return if process found
+                PCB p = pollNext(realTimeQueue);
+                if (p != null) return p;
             }
+            // 30% chance for an interactive process (if available)
             if (!interactiveQueue.isEmpty() && randomDouble < 0.9) {
-                selectedPCB = pollNext(interactiveQueue);
-                if (selectedPCB != null) return selectedPCB; // Return if process found
+                PCB p = pollNext(interactiveQueue);
+                if (p != null) return p;
             }
-            if (!backgroundQueue.isEmpty()) {
-                selectedPCB = pollNext(backgroundQueue);
-                if (selectedPCB != null) return selectedPCB; // Return if process found
-            }
-            selectedPCB = pollNext(realTimeQueue); // Fallback to realtime if available
-            if (selectedPCB != null) return selectedPCB; // Return if process found in fallback
+            // Otherwise, choose from background, but try to avoid IdleProcess
+            PCB p = pollNextBackground();
+            if (p != null) return p;
+            // Fallback to real-time if available.
+            return pollNext(realTimeQueue);
         }
 
-        //  try interactive queue
+        // If no real-time processes, but interactive exist:
         if (!interactiveQueue.isEmpty()) {
             if (randomDouble < 0.75) {
-                selectedPCB = pollNext(interactiveQueue);
-                if (selectedPCB != null) return selectedPCB; // Return if process found
+                PCB p = pollNext(interactiveQueue);
+                if (p != null) return p;
             }
-            if (!backgroundQueue.isEmpty()) {
-                selectedPCB = pollNext(backgroundQueue);
-                if (selectedPCB != null) return selectedPCB; // Return if process found
-            }
-            selectedPCB = pollNext(interactiveQueue); // Fallback to interactive if available
-            if (selectedPCB != null) return selectedPCB; // Return if process found in fallback
+            PCB p = pollNextBackground();
+            if (p != null) return p;
+            return pollNext(interactiveQueue);
         }
 
-        // try background queue
-        if (!backgroundQueue.isEmpty()) {
-            selectedPCB = pollNext(backgroundQueue);
-            if (selectedPCB != null) return selectedPCB; // Return if process found
-        }
-
-        System.out.println("Scheduler.selectProcess: All queues empty, no process available.");
-        return null; // Return null explicitly if no process was selected in any queue
+        // Only background processes available:
+        return pollNextBackground();
     }
 
 
-    // Polls the next PCB from the provided queue, discarding any PCB whose process is finished.
+    private PCB pollNextBackground() {
+        // Try to find a background PCB whose process is not an IdleProcess.
+        for (Iterator<PCB> it = backgroundQueue.iterator(); it.hasNext(); ) {
+            PCB pcb = it.next();
+            if (!(pcb.userlandProcess instanceof IdleProcess) && !pcb.isDone()) {
+                it.remove();
+                return pcb;
+            }
+        }
+        // If none found, fall back to polling the backgroundQueue normally.
+        return pollNext(backgroundQueue);
+    }
+
+
+    // Poll the queue until we find a process that isn't done
     private PCB pollNext(LinkedList<PCB> queue) {
         while (!queue.isEmpty()) {
             PCB pcb = queue.poll();
@@ -172,9 +195,7 @@ public class Scheduler {
         return null;
     }
 
-
-
-    // Moves sleeping processes back into their appropriate queues when their wakeup time is reached.
+    // Wake up processes whose wakeUpTime is reached
     private void WakeupProcesses() {
         long currentTime = System.currentTimeMillis();
         while (!sleepingProcesses.isEmpty() && sleepingProcesses.peek().wakeUpTime <= currentTime) {
@@ -187,40 +208,60 @@ public class Scheduler {
         }
     }
 
-    // Returns whether there is currently a process running.
+    // Check if we have a currently running process
     public boolean hasRunningProcess() {
         return runningProcess != null;
     }
 
-    // Puts the running process to sleep for the specified duration.
-    // Removes it from its queue and adds it to the sleeping list.
+    // Put the running process to sleep
     public void sleep(int mills) {
         setWakeupTime(System.currentTimeMillis() + mills);
         if (runningProcess != null) {
+            // Remove from any ready queue
             switch (runningProcess.getPriority()) {
                 case realtime -> realTimeQueue.remove(runningProcess);
                 case interactive -> interactiveQueue.remove(runningProcess);
                 case background -> backgroundQueue.remove(runningProcess);
             }
+            // Place in sleeping list
             sleepingProcesses.add(new SleepingProcesses(runningProcess, getWakeupTime()));
         }
     }
 
-    // Sets the wakeup time for the currently running process.
     public void setWakeupTime(long wakeupTime) {
         runningProcess.wakeupTime = wakeupTime;
     }
 
-    // Retrieves the wakeup time for the currently running process.
     public long getWakeupTime() {
         return runningProcess.wakeupTime;
     }
 
-    // Removes a process from all queues permanently.
+    // Remove a process from all queues permanently
     public void removeProcess(PCB runningProcess) {
         realTimeQueue.remove(runningProcess);
         interactiveQueue.remove(runningProcess);
         backgroundQueue.remove(runningProcess);
-        sleepingProcesses.remove(runningProcess);
+        sleepingProcesses.removeIf(sp -> sp.process == runningProcess);
     }
+
+
+    private void demote(PCB pcb) {
+        OS.PriorityType oldPriority = pcb.getPriority();
+        OS.PriorityType newPriority = oldPriority;
+        if (oldPriority == OS.PriorityType.realtime) {
+            newPriority = OS.PriorityType.interactive;
+        } else if (oldPriority == OS.PriorityType.interactive) {
+            newPriority = OS.PriorityType.background;
+        }
+        if (oldPriority != newPriority) {
+            pcb.setPriority(newPriority);
+            pcb.resetTimeoutCount();
+            System.out.println("Scheduler.demote: Process " + pcb.pid
+                    + " demoted from " + oldPriority + " to " + newPriority);
+        } else {
+            System.out.println("Scheduler.demote: Process " + pcb.pid
+                    + " already at lowest priority (" + oldPriority + ")");
+        }
+    }
+
 }

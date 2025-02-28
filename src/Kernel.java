@@ -20,6 +20,7 @@ public class Kernel extends Process  { // Kernel extends Process because it is a
                     case CreateProcess -> {
                         System.out.println("Kernel.main: System call is CreateProcess.");
                         OS.retVal = CreateProcess((UserlandProcess) OS.parameters.get(0), (OS.PriorityType) OS.parameters.get(1));
+                        System.out.println("Kernel.main: CreateProcess returned PID: " + OS.retVal);
                     }
                     case SwitchProcess -> {
                         System.out.println("Kernel.main: System call is SwitchProcess.");
@@ -95,7 +96,7 @@ public class Kernel extends Process  { // Kernel extends Process because it is a
         System.out.println("Kernel.CreateProcess: Creating process " + up.getClass().getSimpleName() + " with priority " + priority); // Existing print
 
         // Added debug prints START
-        System.out.println("Kernel.CreateProcess: Calling scheduler.createProcess for process type: " + up.getClass().getSimpleName());
+        System.out.println("Kernel.CreateProcess: Calling scheduler.createProcess for process: " + up.getClass().getSimpleName());
         int pid = scheduler.createProcess(up, priority);
         System.out.println("Kernel.CreateProcess: scheduler.createProcess returned PID: " + pid + " for process type: " + up.getClass().getSimpleName());
 
