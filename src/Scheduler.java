@@ -92,14 +92,15 @@ public class Scheduler {
         System.out.println("Scheduler.switchProcess: Starting process switch.");
 
 
-        // Avoid preempting InitProcess *only if it's still creating processes*
+        // If the currently running process is an InitProcess and the system call is CreateProcess,
+        // delay switching only for CreateProcess calls until initialization is complete.
         if (runningProcess != null && runningProcess.userlandProcess instanceof InitProcess) {
-            InitProcess init = (InitProcess) runningProcess.userlandProcess;
-            if (!OS.isInitProcessFinished()) {  // Add a flag to check if InitProcess is done
-                System.out.println("Scheduler.switchProcess: InitProcess is still running, avoiding preemption.");
-                return; // Init not switched until it is finished
+            if (OS.currentCall == OS.CallType.CreateProcess && !OS.isInitProcessFinished()) {
+                System.out.println("Scheduler.switchProcess: InitProcess is still running, delaying CreateProcess system call.");
+                return; // Delay switching for CreateProcess calls during initialization.
             }
         }
+
 
         // Check if any sleeping processes are ready to be awakened
         WakeupProcesses();

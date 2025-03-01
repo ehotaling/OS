@@ -6,7 +6,7 @@ public class PCB { // Process Control Block
     private int timeoutCount = 0; // tracks consecutive timeouts
     public long wakeupTime = 0;
 
-    // Package private constructor, only kernel should manage PCB's
+    // Only kernel should manage PCB's
     PCB(UserlandProcess up, OS.PriorityType priority) {
         System.out.println("PCB: Creating PCB for process: "
                 + up.getClass().getSimpleName()

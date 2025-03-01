@@ -12,16 +12,23 @@ public class InitProcess extends UserlandProcess {
         System.out.println("InitProcess.main: Creating HelloWorld.");
         OS.CreateProcess(new HelloWorld(), OS.PriorityType.realtime);
         System.out.println("InitProcess.main: HelloWorld created.");
+        cooperate();
 
         System.out.println("InitProcess.main: Creating GoodByeWorld.");
         OS.CreateProcess(new GoodbyeWorld(), OS.PriorityType.realtime);
         System.out.println("InitProcess.main: GoodByeWorld created.");
+        cooperate();
 
 
         System.out.println("InitProcess.main: Creating RealTimeTestProcess.");
         OS.CreateProcess(new RealTimeTestProcess(), OS.PriorityType.realtime);
         System.out.println("InitProcess.main: RealTimeTestProcess created.");
+        cooperate();
 
+        System.out.println("InitProcess.main: Creating SleepTestProcess.");
+        OS.CreateProcess(new SleepTestProcess(), OS.PriorityType.realtime);
+        System.out.println("InitProcess.main: SleepTestProcess created.");
+        cooperate();
 
         OS.setInitProcessFinished(); //  Mark InitProcess as finished before exiting
         // Ensure InitProcess actually exits and is not suspended

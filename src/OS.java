@@ -91,7 +91,6 @@ public class OS {
                 System.out.println("OS.Startup: Interrupted while waiting for InitProcess.");
             }
         }
-        System.out.println("Main: OS Startup complete.");
     }
 
 
