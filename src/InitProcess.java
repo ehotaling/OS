@@ -6,7 +6,7 @@ public class InitProcess extends UserlandProcess {
     @Override
     public void main() throws InterruptedException {
         System.out.println("InitProcess.main: Init process started.");
-        Thread.sleep(1000); // Give time for initialization to complete
+        Thread.sleep(2000); // Give time for initialization to complete
 
         // Ensure InitProcess gets CPU time and isn't preempted before finishing
         System.out.println("InitProcess.main: Creating HelloWorld.");

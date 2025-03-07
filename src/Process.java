@@ -13,11 +13,10 @@ public abstract class Process implements Runnable{
    // flag to indicate termination.
     private boolean terminated = false;
 
-    // Track when current quantum started
-    public long quantumStartTime = System.currentTimeMillis();
 
     public Process() {
         System.out.println("Process: Process constructor for: " + this.getClass().getSimpleName()); // Debug print
+        this.thread.start(); // TODO should this be this.start() or thread.start()????
     }
 
     // Mark process as terminated.
@@ -55,6 +54,7 @@ public abstract class Process implements Runnable{
 
     }
 
+
     // acquires (decrements) the semaphore, stopping this thread from running
     public void stop() {
         // System.out.println("Process.stop: Stopping process: " + this.getClass().getSimpleName()); // Debug print
@@ -66,6 +66,7 @@ public abstract class Process implements Runnable{
     public void run() {
         System.out.println("Process.run: Run method invoked for process: " + this.getClass().getSimpleName());
         try {
+            available.acquire();
             main();
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
@@ -75,23 +76,13 @@ public abstract class Process implements Runnable{
         }
     }
 
-    // Reset quantum
-    public void resetQuantum() {
-        quantumStartTime = System.currentTimeMillis();
-    }
 
-
-    // The cooperative yield method.
     // When the process's quantum is expired, cooperate() calls OS.switchProcess()
-    // and then blocks (by acquiring the semaphore) until the scheduler resumes it.
     public void cooperate() throws InterruptedException {
         if (isExpired) {
             System.out.println("Process.cooperate: Process " + this.getClass().getSimpleName() + " is expired, switching process.");
             isExpired = false;
-            resetQuantum();
             OS.switchProcess();
-            // Block until resumed by the scheduler (which calls start() to release one permit).
-            available.acquire();
         } else {
             System.out.println("Process.cooperate: Process " + this.getClass().getSimpleName() + " cooperating.");
         }

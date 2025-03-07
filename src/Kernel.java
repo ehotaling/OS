@@ -62,9 +62,6 @@ public class Kernel extends Process  { // Kernel extends Process because it is a
                 OS.currentCall = null;
             }
 
-            // Attempt to switch to a new process
-            System.out.println("Kernel.main: Calling scheduler.switchProcess().");
-            scheduler.switchProcess();
 
             // Ensure there's always a running process
             if (scheduler.runningProcess == null) {
@@ -72,7 +69,7 @@ public class Kernel extends Process  { // Kernel extends Process because it is a
                 continue;  // Kernel loop will run again, ensuring the IdleProcess gets scheduled
             }
 
-            // Start the scheduled process
+            // //TODO might not need.... Start the scheduled process
             System.out.println("Kernel.main: Starting scheduled process: " +
                     scheduler.runningProcess.userlandProcess.getClass().getSimpleName() +
                     ", PID: " + scheduler.runningProcess.pid);
