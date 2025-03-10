@@ -93,7 +93,6 @@ public class PCB { // Process Control Block
         System.out.println("PCB.start: Starting process: "
                 + userlandProcess.getClass().getSimpleName()
                 + ", PID: " + pid);
-        userlandProcess.resetQuantum(); // Reset the quantum timer before running.
         userlandProcess.start();
     }
 }
