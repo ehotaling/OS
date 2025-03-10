@@ -59,7 +59,6 @@ public class Kernel extends Process  { // Kernel extends Process because it is a
                 }
             }
             // Perform a context switch for all system calls but don't duplicate switch process
-            OS.CallType currentCall = OS.currentCall;
             if (OS.currentCall != OS.CallType.SwitchProcess) {
                 scheduler.switchProcess();
             }
@@ -112,7 +111,6 @@ public class Kernel extends Process  { // Kernel extends Process because it is a
             // Remove it from the scheduler.
             scheduler.removeProcess(scheduler.runningProcess);
             scheduler.runningProcess = null;
-            scheduler.switchProcess();
         }
         OS.retVal = 0;  // Signal completion so any waiting loop can exit.
         System.out.println("Kernel.Exit: Exit process finished.");

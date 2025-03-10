@@ -83,15 +83,6 @@ public class Scheduler {
     // Process switching
     public void switchProcess() {
         System.out.println("Scheduler.switchProcess: Starting process switch.");
-        // TODO this is suspect. I need to look at this again when I have time.
-//        // If the currently running process is an InitProcess and the system call is CreateProcess,
-//        // delay switching only for CreateProcess calls until initialization is complete.
-//        if (runningProcess != null && runningProcess.userlandProcess instanceof InitProcess) {
-//            if (OS.currentCall == OS.CallType.CreateProcess && !OS.isInitProcessFinished()) {
-//                System.out.println("Scheduler.switchProcess: InitProcess is still running, delaying CreateProcess system call.");
-//                return; // Delay switching for CreateProcess calls during initialization.
-//            }
-//        }
 
         // Check if any sleeping processes are ready to be awakened
         WakeupProcesses();

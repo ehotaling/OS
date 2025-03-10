@@ -6,31 +6,29 @@ public class InitProcess extends UserlandProcess {
     @Override
     public void main() throws InterruptedException {
         System.out.println("InitProcess.main: Init process started.");
-//        Thread.sleep(2000); // Give time for initialization to complete
 
         System.out.println("InitProcess.main: Creating HelloWorld.");
         OS.CreateProcess(new HelloWorld(), OS.PriorityType.realtime);
         System.out.println("InitProcess.main: HelloWorld created.");
-        cooperate();
 
         System.out.println("InitProcess.main: Creating GoodByeWorld.");
         OS.CreateProcess(new GoodbyeWorld(), OS.PriorityType.realtime);
         System.out.println("InitProcess.main: GoodByeWorld created.");
-        cooperate();
-
 
         System.out.println("InitProcess.main: Creating testDemotion.");
         OS.CreateProcess(new testDemotion(), OS.PriorityType.realtime);
         System.out.println("InitProcess.main: testDemotion created.");
-        cooperate();
 
         System.out.println("InitProcess.main: Creating SleepTestProcess.");
         OS.CreateProcess(new SleepTestProcess(), OS.PriorityType.realtime);
         System.out.println("InitProcess.main: SleepTestProcess created.");
-        cooperate();
 
-        OS.setInitProcessFinished(); //  Mark InitProcess as finished before exiting
-        // Ensure InitProcess actually exits and is not suspended
+        System.out.println("InitProcess.main: Creating IdleProcess...");
+        OS.CreateProcess(new IdleProcess(), OS.PriorityType.background);
+        System.out.println("InitProcess.main: IdleProcess created.");
+
+        // Give time for all startup processes to be before exiting (which will lead to scheduler.switchProcess().
+        Thread.sleep(1000);
         System.out.println("InitProcess.main: Exiting.");
         OS.Exit();
     }

@@ -65,17 +65,7 @@ public class OS {
         System.out.println("OS.Startup: Initializing Kernel...");
         ki = new Kernel();
         System.out.println("OS.Startup: Kernel initialized.");
-        int idleProcessPID;
-        // Create the idle process first.
-        System.out.println("OS.Startup: Creating IdleProcess...");
-        idleProcessPID = CreateProcess(new IdleProcess(), PriorityType.background);
-        System.out.println("OS.Startup: CreateProcess for IdleProcess returned PID: " + idleProcessPID);
-        if (idleProcessPID == -1) {
-            System.err.println("OS.Startup: Error. CreateProcess for IdleProcess failed.");
-        }
-        System.out.println("OS.Startup: IdleProcess creation requested.");
-
-        // Then create the init process.
+        // Create the init process.
         System.out.println("OS.Startup: Creating InitProcess...");
         CreateProcess(init, PriorityType.interactive);
         System.out.println("OS.Startup: InitProcess creation requested.");
