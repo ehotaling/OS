@@ -46,8 +46,15 @@ public class Scheduler {
         // Set up a periodic interrupt every 250ms to simulate time slices for running processes.
         TimerTask interrupt = new TimerTask() {
             public void run() {
+                // If the process is already expired (didn't cooperate in the previous quantum)
                 if (runningProcess != null) {
-                    runningProcess.userlandProcess.requestStop();
+                    if (runningProcess.userlandProcess.isExpired) {
+                        // Increment timeout count and check for demotion
+                        runningProcess.incrementTimeoutCount();
+                    } else {
+                        // Mark the process as expired because its quantum is up
+                        runningProcess.userlandProcess.requestStop();
+                    }
                 }
             }
         };
@@ -76,17 +83,15 @@ public class Scheduler {
     // Process switching
     public void switchProcess() {
         System.out.println("Scheduler.switchProcess: Starting process switch.");
-
-
-        // If the currently running process is an InitProcess and the system call is CreateProcess,
-        // delay switching only for CreateProcess calls until initialization is complete.
-        if (runningProcess != null && runningProcess.userlandProcess instanceof InitProcess) {
-            if (OS.currentCall == OS.CallType.CreateProcess && !OS.isInitProcessFinished()) {
-                System.out.println("Scheduler.switchProcess: InitProcess is still running, delaying CreateProcess system call.");
-                return; // Delay switching for CreateProcess calls during initialization.
-            }
-        }
-
+        // TODO this is suspect. I need to look at this again when I have time.
+//        // If the currently running process is an InitProcess and the system call is CreateProcess,
+//        // delay switching only for CreateProcess calls until initialization is complete.
+//        if (runningProcess != null && runningProcess.userlandProcess instanceof InitProcess) {
+//            if (OS.currentCall == OS.CallType.CreateProcess && !OS.isInitProcessFinished()) {
+//                System.out.println("Scheduler.switchProcess: InitProcess is still running, delaying CreateProcess system call.");
+//                return; // Delay switching for CreateProcess calls during initialization.
+//            }
+//        }
 
         // Check if any sleeping processes are ready to be awakened
         WakeupProcesses();
@@ -103,8 +108,11 @@ public class Scheduler {
                 + runningProcess.userlandProcess.getClass().getSimpleName()
                 + " (PID " + runningProcess.pid + ")");
 
-        // Calculate current process start time and store in variable
-        processStartTime = clock.millis();
+        if (runningProcess != null) {
+            // ensure new process starts with correct isExpired flag and start it
+            runningProcess.userlandProcess.isExpired = false;
+            runningProcess.userlandProcess.start();
+        }
         System.out.println("Scheduler.switchProcess: Process switch complete.");
     }
 
@@ -235,26 +243,6 @@ public class Scheduler {
             case realtime -> realTimeQueue.remove(runningProcess);
             case interactive -> interactiveQueue.remove(runningProcess);
             case background -> backgroundQueue.remove(runningProcess);
-        }
-    }
-
-
-    private void demote(PCB pcb) {
-        OS.PriorityType oldPriority = pcb.getPriority();
-        OS.PriorityType newPriority = oldPriority;
-        if (oldPriority == OS.PriorityType.realtime) {
-            newPriority = OS.PriorityType.interactive;
-        } else if (oldPriority == OS.PriorityType.interactive) {
-            newPriority = OS.PriorityType.background;
-        }
-        if (oldPriority != newPriority) {
-            pcb.setPriority(newPriority);
-            pcb.resetTimeoutCount();
-            System.out.println("Scheduler.demote: Process " + pcb.pid
-                    + " demoted from " + oldPriority + " to " + newPriority);
-        } else {
-            System.out.println("Scheduler.demote: Process " + pcb.pid
-                    + " already at lowest priority (" + oldPriority + ")");
         }
     }
 

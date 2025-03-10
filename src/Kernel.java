@@ -57,10 +57,13 @@ public class Kernel extends Process  { // Kernel extends Process because it is a
                      */
 
                 }
-
-                OS.parameters.clear();
-                OS.currentCall = null;
             }
+            // Perform a context switch for all system calls but don't duplicate switch process
+            OS.CallType currentCall = OS.currentCall;
+            if (OS.currentCall != OS.CallType.SwitchProcess) {
+                scheduler.switchProcess();
+            }
+            this.stop();
         }
     }
 
@@ -68,7 +71,8 @@ public class Kernel extends Process  { // Kernel extends Process because it is a
     private void SwitchProcess() {
         System.out.println("Kernel.SwitchProcess: Switching process via scheduler."); // Debug print
         scheduler.switchProcess();
-        scheduler.runningProcess.start();
+
+        // scheduler.runningProcess.start(); // don't think we need this here, we handle this in Scheduler.switchProcess
     }
 
 

@@ -3,8 +3,8 @@ public class PCB { // Process Control Block
     public final UserlandProcess userlandProcess;
     public int pid;
     private OS.PriorityType priority;
-    private int timeoutCount = 0; // tracks consecutive timeouts
-    public long wakeupTime = 0;
+    private int timeoutCount; // tracks consecutive timeouts
+    public long wakeupTime;
 
     // Only kernel should manage PCB's
     PCB(UserlandProcess up, OS.PriorityType priority) {
@@ -16,6 +16,7 @@ public class PCB { // Process Control Block
         pid = nextPid++; // Process gets a pid, next process gets the next pid up
         this.userlandProcess = up;
         this.priority = priority;
+        this.timeoutCount = 0;
 
         if (!up.thread.isAlive()) {
             System.out.println("PCB: Process thread is not alive, starting thread for: "
@@ -35,6 +36,10 @@ public class PCB { // Process Control Block
     // increments the consecutive timeouts counter
     public void incrementTimeoutCount() {
         timeoutCount++;
+        if (timeoutCount > 5) {
+            demotePriority();
+            timeoutCount = 0;
+        }
     }
 
     // Provide an accessor so Scheduler can see if we crossed the demotion threshold
@@ -94,5 +99,16 @@ public class PCB { // Process Control Block
                 + userlandProcess.getClass().getSimpleName()
                 + ", PID: " + pid);
         userlandProcess.start();
+    }
+
+    private void demotePriority() {
+        OS.PriorityType oldPriority = priority;
+        switch (priority) {
+            case realtime -> priority = OS.PriorityType.interactive;
+            case interactive -> priority = OS.PriorityType.background;
+        }
+        resetTimeoutCount();
+        System.out.println("Scheduler.demote: Process " + pid
+                + " demoted from " + oldPriority + " to " + priority);
     }
 }
