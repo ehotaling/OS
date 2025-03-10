@@ -19,9 +19,9 @@ public class InitProcess extends UserlandProcess {
         cooperate();
 
 
-        System.out.println("InitProcess.main: Creating RealTimeTestProcess.");
+        System.out.println("InitProcess.main: Creating testDemotion.");
         OS.CreateProcess(new testDemotion(), OS.PriorityType.realtime);
-        System.out.println("InitProcess.main: RealTimeTestProcess created.");
+        System.out.println("InitProcess.main: testDemotion created.");
         cooperate();
 
         System.out.println("InitProcess.main: Creating SleepTestProcess.");
