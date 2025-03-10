@@ -4,8 +4,6 @@ import java.util.List;
 // Gateway between the userland thread and the kernel thread.
 public class OS {
 
-    private static boolean initProcessFinished = false;
-
     private static Kernel ki; // The one and only one instance of the kernel.
 
     // A static array list of parameters to the function; we don’t know what they will be, so we will make it
@@ -19,14 +17,8 @@ public class OS {
     // An enum of what function to call
     public enum CallType {SwitchProcess,SendMessage, Open, Close, Read, Seek, Write, GetMapping, CreateProcess, Sleep, GetPID, AllocateMemory, FreeMemory, GetPIDByName, WaitForMessage, Exit}
 
-    public static boolean isInitProcessFinished() {
-        return initProcessFinished;
-    }
 
-    public static void setInitProcessFinished() {
-        System.out.println( "OS.setInitProcessFinished: Setting init process finished.");
-        initProcessFinished = true;
-    }
+    private static boolean initProcessDone = false;
 
     // A static instance of that enum
     public static CallType currentCall;
@@ -49,8 +41,13 @@ public class OS {
         System.out.println("OS.startTheKernel: Kernel start sequence complete.");
     }
 
+    public static void setInitProcessDone(boolean b) {
+        initProcessDone = b;
+    }
 
-
+    public boolean getInitProcessDone() {
+        return initProcessDone;
+    }
 
     public static void switchProcess() {
         System.out.println("OS.switchProcess: Switch process requested."); // Debug print
@@ -68,7 +65,7 @@ public class OS {
         // Create the init process.
         System.out.println("OS.Startup: Creating InitProcess...");
         CreateProcess(init, PriorityType.interactive);
-        System.out.println("OS.Startup: InitProcess creation requested.");
+        System.out.println("OS.Startup: InitProcess created.");
     }
 
 

@@ -18,16 +18,16 @@ public class PCB { // Process Control Block
         this.priority = priority;
         this.timeoutCount = 0;
 
-        if (!up.thread.isAlive()) {
-            System.out.println("PCB: Process thread is not alive, starting thread for: "
-                    + up.getClass().getSimpleName() + ", PID: " + pid);
-            up.thread.start();
-            System.out.println("PCB: Thread started for: "
-                    + up.getClass().getSimpleName() + ", PID: " + pid);
-        } else {
-            System.out.println("PCB: Process thread is already alive for: "
-                    + up.getClass().getSimpleName() + ", PID: " + pid);
-        }
+//        if (!up.thread.isAlive()) {
+//            System.out.println("PCB: Process thread is not alive, starting thread for: "
+//                    + up.getClass().getSimpleName() + ", PID: " + pid);
+//            up.thread.start();
+//            System.out.println("PCB: Thread started for: "
+//                    + up.getClass().getSimpleName() + ", PID: " + pid);
+//        } else {
+//            System.out.println("PCB: Process thread is already alive for: "
+//                    + up.getClass().getSimpleName() + ", PID: " + pid);
+//        }
 
         System.out.println("PCB: PCB created for: "
                 + up.getClass().getSimpleName() + ", PID: " + pid);

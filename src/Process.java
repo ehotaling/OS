@@ -45,12 +45,10 @@ public abstract class Process implements Runnable{
 
     // releases (increments) the semaphore, allowing this thread to run
     public void start() {
-        if (available.availablePermits() == 0) {
-            System.out.println("Process.start: Starting process: " + this.getClass().getSimpleName()); // Debug print
-            available.release();
-            System.out.println("Process.start: Semaphore released for process: " +
-                    this.getClass().getSimpleName() + ", permits: " + available.availablePermits()); // Debug print
-        }
+        System.out.println("Process.start: Starting process: " + this.getClass().getSimpleName()); // Debug print
+        available.release();
+        System.out.println("Process.start: Semaphore released for process: " +
+                this.getClass().getSimpleName() + ", permits: " + available.availablePermits()); // Debug print
 
     }
 

@@ -46,15 +46,15 @@ public class Scheduler {
         // Set up a periodic interrupt every 250ms to simulate time slices for running processes.
         TimerTask interrupt = new TimerTask() {
             public void run() {
-                // If the process is already expired (didn't cooperate in the previous quantum)
                 if (runningProcess != null) {
-                    if (runningProcess.userlandProcess.isExpired) {
-                        // Increment timeout count and check for demotion
+                    System.out.println("TimerTask: Running process: " + runningProcess.userlandProcess.getClass().getSimpleName() + " (PID: " + runningProcess.pid + ")");
+                    if (runningProcess.userlandProcess.isExpired && !(runningProcess.userlandProcess instanceof InitProcess)) {
+                        System.out.println("TimerTask: Process " + runningProcess.userlandProcess.getClass().getSimpleName() + " expired, incrementing timeout.");
                         runningProcess.incrementTimeoutCount();
-                    } else {
-                        // Mark the process as expired because its quantum is up
                         runningProcess.userlandProcess.requestStop();
                     }
+                } else {
+                    System.out.println("TimerTask: No running process in scheduler.");
                 }
             }
         };
@@ -89,6 +89,8 @@ public class Scheduler {
 
         // If the running process is still active, place it back in its queue
         if (runningProcess != null && !runningProcess.isDone()) {
+            runningProcess.requestStop(); // Mark as expired
+            runningProcess.stop(); // Actually stop the thread
             addProcessToQueue(runningProcess);
         }
 
