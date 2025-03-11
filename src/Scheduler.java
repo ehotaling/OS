@@ -48,7 +48,14 @@ public class Scheduler {
             public void run() {
                 if (runningProcess != null) {
                     System.out.println("TimerTask: Running process: " + runningProcess.userlandProcess.getClass().getSimpleName() + " (PID: " + runningProcess.pid + ")");
-                    if (runningProcess.userlandProcess.isExpired && !(runningProcess.userlandProcess instanceof InitProcess)) {
+                    if (runningProcess.isDone()) {
+                        System.out.println("TimerTask: Running process has been terminated. Calling switchProcess.");
+                        try {
+                            switchProcess();
+                        } catch (InterruptedException e) {
+                            throw new RuntimeException(e);
+                        }
+                    } else if (runningProcess.userlandProcess.isExpired && !(runningProcess.userlandProcess instanceof InitProcess)) {
                         System.out.println("TimerTask: Process " + runningProcess.userlandProcess.getClass().getSimpleName() + " expired, incrementing timeout.");
                         runningProcess.incrementTimeoutCount();
                         runningProcess.userlandProcess.requestStop();
@@ -64,24 +71,24 @@ public class Scheduler {
 
     // Creates a new process and places it in the correct priority queue.
     // If no process is currently running, trigger a switch immediately.
-    public int createProcess(UserlandProcess up, OS.PriorityType p) {
-        PCB userlandProcess = new PCB(up, p);
+    public int createProcess(UserlandProcess up, OS.PriorityType p) throws InterruptedException {
         System.out.println("Scheduler.createProcess: Creating process of type: "
-                + up.toString() + ", priority: " + p);
+                + up.getClass().getSimpleName() + ", priority: " + p);
+        PCB userlandProcess = new PCB(up, p);
         addProcessToQueue(userlandProcess, p);
         System.out.println("Scheduler.createProcess: Process "
                 + up.getClass().getSimpleName() + " created with PID: "
                 + userlandProcess.pid + " and added to scheduler.");
 
         if (runningProcess == null) {
+            System.out.println("Scheduler.createProcess: calling switchProcess.");
             switchProcess();
         }
-
         return userlandProcess.pid;
     }
 
     // Process switching
-    public void switchProcess() {
+    public void switchProcess() throws InterruptedException {
         System.out.println("Scheduler.switchProcess: Starting process switch.");
 
         // Check if any sleeping processes are ready to be awakened
@@ -97,9 +104,11 @@ public class Scheduler {
         // Pick the next process using the probabilistic model
         runningProcess = selectProcess();
 
-        System.out.println("Scheduler.switchProcess: Next process: "
-                + runningProcess.userlandProcess.getClass().getSimpleName()
-                + " (PID " + runningProcess.pid + ")");
+        if (runningProcess != null) {
+            System.out.println("Scheduler.switchProcess: Next process: "
+                    + runningProcess.userlandProcess.getClass().getSimpleName()
+                    + " (PID " + runningProcess.pid + ")");
+        }
 
         if (runningProcess != null) {
             // ensure new process starts with correct isExpired flag and start it

@@ -8,36 +8,32 @@ public class Kernel extends Process  { // Kernel extends Process because it is a
     }
 
     @Override
-    public void main() {
+    public void main() throws InterruptedException {
         System.out.println("Kernel.main: Kernel main loop started.");
-
         while (true) {
-            // Process system calls
-            if (!OS.parameters.isEmpty()) {
-                System.out.println("Kernel.main: Processing system call: " + OS.currentCall);
-
-                switch (OS.currentCall) {
-                    case CreateProcess -> {
-                        System.out.println("Kernel.main: System call is CreateProcess.");
-                        OS.retVal = CreateProcess((UserlandProcess) OS.parameters.get(0), (OS.PriorityType) OS.parameters.get(1));
-                        System.out.println("Kernel.main: CreateProcess returned PID: " + OS.retVal);
-                    }
-                    case SwitchProcess -> {
-                        System.out.println("Kernel.main: System call is SwitchProcess.");
-                        SwitchProcess();
-                    }
-                    case Sleep -> {
-                        System.out.println("Kernel.main: System call is Sleep.");
-                        Sleep((int) OS.parameters.get(0));
-                    }
-                    case GetPID -> {
-                        System.out.println("Kernel.main: System call is GetPID.");
-                        OS.retVal = GetPid();
-                    }
-                    case Exit -> {
-                        System.out.println("Kernel.main: System call is Exit.");
-                        Exit();
-                    }
+            System.out.println("Kernel.main: Processing system call: " + OS.currentCall);
+            switch (OS.currentCall) {
+                case CreateProcess -> {
+                    System.out.println("Kernel.main: System call is CreateProcess.");
+                    OS.retVal = CreateProcess((UserlandProcess) OS.parameters.get(0), (OS.PriorityType) OS.parameters.get(1));
+                    System.out.println("Kernel.main: CreateProcess returned PID: " + OS.retVal);
+                }
+                case SwitchProcess -> {
+                    System.out.println("Kernel.main: System call is SwitchProcess.");
+                    SwitchProcess();
+                }
+                case Sleep -> {
+                    System.out.println("Kernel.main: System call is Sleep.");
+                    Sleep((int) OS.parameters.get(0));
+                }
+                case GetPID -> {
+                    System.out.println("Kernel.main: System call is GetPID.");
+                    OS.retVal = GetPid();
+                }
+                case Exit -> {
+                    System.out.println("Kernel.main: System call is Exit.");
+                    Exit();
+                }
 
                      /*
                     // Devices
@@ -56,26 +52,24 @@ public class Kernel extends Process  { // Kernel extends Process because it is a
                     case FreeMemory ->
                      */
 
-                }
-                OS.parameters.clear(); // Clear parameters after processing
-                OS.currentCall = null; // Reset current call
             }
-
+            OS.parameters.clear(); // Clear parameters after processing
+            OS.currentCall = null; // Reset current call
+            System.out.println("Kernel.main: Kernel calling stop on self.");
             this.stop();
         }
+
+
     }
 
-
-    private void SwitchProcess() {
+    private void SwitchProcess() throws InterruptedException {
         System.out.println("Kernel.SwitchProcess: Switching process via scheduler."); // Debug print
         scheduler.switchProcess();
-
-        // scheduler.runningProcess.start(); // don't think we need this here, we handle this in Scheduler.switchProcess
     }
 
 
     // Calls the scheduler’s version of CreateProcess
-    private int CreateProcess(UserlandProcess up, OS.PriorityType priority) {
+    private int CreateProcess(UserlandProcess up, OS.PriorityType priority) throws InterruptedException {
         System.out.println("Kernel.CreateProcess: Creating process " + up.getClass().getSimpleName() + " with priority " + priority); // Existing print
 
         // Added debug prints START
@@ -83,13 +77,9 @@ public class Kernel extends Process  { // Kernel extends Process because it is a
         int pid = scheduler.createProcess(up, priority);
         System.out.println("Kernel.CreateProcess: scheduler.createProcess returned PID: " + pid + " for process type: " + up.getClass().getSimpleName());
 
-        System.out.println("Kernel.CreateProcess: Setting OS.retVal to PID: " + pid + " for process type: " + up.getClass().getSimpleName());
-        OS.retVal = pid;
-        System.out.println("Kernel.CreateProcess: OS.retVal set to: " + OS.retVal + " for process type: " + up.getClass().getSimpleName());
         // Added debug prints END
-
-        System.out.println("Kernel.CreateProcess: Process created, returning PID: " + OS.retVal); // Existing print (this might be redundant now, but let's keep it for now)
-        return (int) OS.retVal;
+        System.out.println("Kernel.CreateProcess: Process created, returning PID: " + pid); // Existing print (this might be redundant now, but let's keep it for now)
+        return pid;
     }
 
     private void Sleep(int mills) {
@@ -107,12 +97,7 @@ public class Kernel extends Process  { // Kernel extends Process because it is a
                     Thread.sleep(10);
                 } catch (InterruptedException _) {}
             }
-            // Remove it from the scheduler.
-            scheduler.removeProcess(scheduler.runningProcess);
-            scheduler.runningProcess = null;
-            scheduler.switchProcess();
         }
-        OS.retVal = 0;  // Signal completion so any waiting loop can exit.
         System.out.println("Kernel.Exit: Exit process finished.");
     }
 
@@ -121,13 +106,14 @@ public class Kernel extends Process  { // Kernel extends Process because it is a
     // This returns the PID of the currently running process
     private int GetPid() {
         System.out.println("Kernel.GetPid: Getting PID of running process."); // Debug print
+        int pid;
         if (scheduler.runningProcess != null) {
-            OS.retVal = scheduler.runningProcess.pid;
+            pid = scheduler.runningProcess.pid;
         } else {
-            OS.retVal = -1;
+            pid = -1;
         }
-        System.out.println("Kernel.GetPid: Returning PID: " + OS.retVal); // Debug print
-        return (int) OS.retVal;
+        System.out.println("Kernel.GetPid: Returning PID: " + pid); // Debug print
+        return pid;
     }
 
     private int Open(String s) {

@@ -16,7 +16,7 @@ public abstract class Process implements Runnable{
 
     public Process() {
         System.out.println("Process: Process constructor for: " + this.getClass().getSimpleName()); // Debug print
-        this.thread.start(); // TODO should this be this.start() or thread.start()????
+        thread.start();
     }
 
     // Mark process as terminated.
@@ -46,18 +46,23 @@ public abstract class Process implements Runnable{
     // releases (increments) the semaphore, allowing this thread to run
     public void start() {
         System.out.println("Process.start: Starting process: " + this.getClass().getSimpleName()); // Debug print
-        available.release();
-        System.out.println("Process.start: Semaphore released for process: " +
-                this.getClass().getSimpleName() + ", permits: " + available.availablePermits()); // Debug print
+        if (available.availablePermits() == 0) {
+            available.release();
+            System.out.println("Process.start: Semaphore released for process: " +
+                    this.getClass().getSimpleName() + ",  now has permits: " + available.availablePermits()); // Debug print
+        } else {
+            System.out.println("Process.start: " + this.getClass().getSimpleName() + ", already had permits: " + available.availablePermits());
+        }
+
 
     }
 
 
     // acquires (decrements) the semaphore, stopping this thread from running
-    public void stop() {
-        // System.out.println("Process.stop: Stopping process: " + this.getClass().getSimpleName()); // Debug print
-        available.acquireUninterruptibly();
-        System.out.println("Process.stop: Semaphore acquired for process: " + this.getClass().getSimpleName() + ", permits: " + available.availablePermits()); // Debug print
+    public void stop() throws InterruptedException {
+         System.out.println("Process.stop: Stopping process: " + this.getClass().getSimpleName()); // Debug print
+        available.acquire();
+        System.out.println("Process.stop: Process stopped: " + this.getClass().getSimpleName() + ",now has permits: " + available.availablePermits());
     }
 
     @Override
@@ -68,9 +73,6 @@ public abstract class Process implements Runnable{
             main();
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
-        } finally {
-            System.out.println("Process.run: Run method finished for process: " + this.getClass().getSimpleName());
-            terminate(); // Ensure that the process is marked as done.
         }
     }
 

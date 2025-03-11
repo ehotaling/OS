@@ -18,36 +18,14 @@ public class OS {
     public enum CallType {SwitchProcess,SendMessage, Open, Close, Read, Seek, Write, GetMapping, CreateProcess, Sleep, GetPID, AllocateMemory, FreeMemory, GetPIDByName, WaitForMessage, Exit}
 
 
-    private static boolean initProcessDone = false;
-
     // A static instance of that enum
     public static CallType currentCall;
 
-    private static void startTheKernel() {
-        System.out.println("OS.startTheKernel: Starting kernel initiation sequence.");
-        PCB curr = ki.getScheduler().runningProcess;
-        if (OS.currentCall != null) {
-            System.out.println("OS.startTheKernel: Starting kernel instance for system call: " + OS.currentCall);
-            ki.start();
-        }
-
-        Scheduler scheduler = ki.getScheduler();
-        if (scheduler.hasRunningProcess()) {
-            System.out.println("OS.startTheKernel: Stopping running process: " + scheduler.runningProcess.userlandProcess.getClass().getSimpleName());
-            curr.stop();
-        } else {
-            System.out.println("OS.startTheKernel: No running process to stop.");
-        }
-        System.out.println("OS.startTheKernel: Kernel start sequence complete.");
+    public static void startTheKernel() {
+        ki.start();
     }
 
-    public static void setInitProcessDone(boolean b) {
-        initProcessDone = b;
-    }
 
-    public boolean getInitProcessDone() {
-        return initProcessDone;
-    }
 
     public static void switchProcess() {
         System.out.println("OS.switchProcess: Switch process requested."); // Debug print
@@ -74,7 +52,6 @@ public class OS {
     public static int CreateProcess(UserlandProcess up) throws InterruptedException {
         return CreateProcess(up,PriorityType.interactive);
     }
-
 
     public static int CreateProcess(UserlandProcess up, PriorityType priority) throws InterruptedException {
         System.out.println("OS.CreateProcess: Request to create process of name: " + up.getClass().getSimpleName() + ", priority: " + priority); // Debug print
@@ -106,7 +83,6 @@ public class OS {
             } catch (InterruptedException _) {}
         }
         int pid = (int) retVal;
-        retVal = null;
         return pid;
     }
 

@@ -33,7 +33,6 @@ public class InitProcess extends UserlandProcess {
         cooperate();
 
         System.out.println("InitProcess.main: Exiting.");
-        OS.setInitProcessDone(true);
         OS.Exit();
     }
 }

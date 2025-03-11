@@ -67,25 +67,8 @@ public class PCB { // Process Control Block
     }
 
     // calls userlandProcess’ stop. Loops with Thread.sleep() until ulp.isStopped() is true.
-    public void stop() {
-        System.out.println("PCB.stop: Stopping process: "
-                + userlandProcess.getClass().getSimpleName()
-                + ", PID: " + pid);
-
-        while (!userlandProcess.isStopped()) {
-            if (userlandProcess.isDone()) {  // If finished, break immediately.
-                break;
-            }
-            try {
-                userlandProcess.stop();
-                Thread.sleep(10);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-        }
-        System.out.println("PCB.stop: Process stopped: "
-                + userlandProcess.getClass().getSimpleName()
-                + ", PID: " + pid);
+    public void stop() throws InterruptedException {
+        userlandProcess.stop();
     }
 
     // calls userlandprocess’ isDone()
