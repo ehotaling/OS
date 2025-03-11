@@ -1,7 +1,7 @@
 // This is the class that manages what happens on startup
 public class InitProcess extends UserlandProcess {
-    public InitProcess() {}
-
+    public InitProcess() {
+    }
 
     @Override
     public void main() throws InterruptedException {
@@ -34,5 +34,7 @@ public class InitProcess extends UserlandProcess {
 
         System.out.println("InitProcess.main: Exiting.");
         OS.Exit();
+        return;
     }
+
 }

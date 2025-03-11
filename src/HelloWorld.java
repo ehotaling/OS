@@ -6,7 +6,7 @@ public class HelloWorld extends UserlandProcess {
             try {
                 cooperate();
                 System.out.println("Hello World");
-                Thread.sleep(250);
+                Thread.sleep(300);
             } catch (Exception e) {}
 
         }

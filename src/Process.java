@@ -6,23 +6,24 @@ public abstract class Process implements Runnable{
     public Thread thread = new Thread(this);
 
     // Start at 0 so it the process doesn't run immediately
-    private final Semaphore available = new Semaphore(0);
+    final Semaphore available = new Semaphore(0);
 
     public boolean isExpired = false;
 
    // flag to indicate termination.
-    private boolean terminated = false;
+    private boolean exited = false;
 
 
     public Process() {
         System.out.println("Process: Process constructor for: " + this.getClass().getSimpleName()); // Debug print
-        thread.start();
+        this.thread = new Thread(this);
     }
 
-    // Mark process as terminated.
-    public void terminate() {
-        terminated = true;
+    public void exit() {
+        exited = true;
+
     }
+
 
     // sets the boolean indicating that this process’ quantum has expired
     public void requestStop() {
@@ -40,29 +41,27 @@ public abstract class Process implements Runnable{
 
     // true when the Java thread is not alive
     public boolean isDone() {
-        return terminated || !thread.isAlive();
+        return exited || !thread.isAlive();
     }
 
     // releases (increments) the semaphore, allowing this thread to run
     public void start() {
-        System.out.println("Process.start: Starting process: " + this.getClass().getSimpleName()); // Debug print
-        if (available.availablePermits() == 0) {
-            available.release();
-            System.out.println("Process.start: Semaphore released for process: " +
-                    this.getClass().getSimpleName() + ",  now has permits: " + available.availablePermits()); // Debug print
-        } else {
-            System.out.println("Process.start: " + this.getClass().getSimpleName() + ", already had permits: " + available.availablePermits());
+        available.release();
+        if (!thread.isAlive()) {
+            thread.start();
         }
-
-
     }
 
 
     // acquires (decrements) the semaphore, stopping this thread from running
     public void stop() throws InterruptedException {
-         System.out.println("Process.stop: Stopping process: " + this.getClass().getSimpleName()); // Debug print
-        available.acquire();
-        System.out.println("Process.stop: Process stopped: " + this.getClass().getSimpleName() + ",now has permits: " + available.availablePermits());
+        System.out.println("Process.stop: Stopping process: " + this.getClass().getSimpleName()); // Debug print
+        try {
+            available.acquire();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        System.out.println("Process.stop: Process stopped: " + this.getClass().getSimpleName() + ", now has permits: " + available.availablePermits());
     }
 
     @Override
@@ -72,7 +71,7 @@ public abstract class Process implements Runnable{
             available.acquire();
             main();
         } catch (InterruptedException e) {
-            throw new RuntimeException(e);
+            Thread.currentThread().interrupt();
         }
     }
 
@@ -80,11 +79,14 @@ public abstract class Process implements Runnable{
     // When the process's quantum is expired, cooperate() calls OS.switchProcess()
     public void cooperate() throws InterruptedException {
         if (isExpired) {
-            System.out.println("Process.cooperate: Process " + this.getClass().getSimpleName() + " is expired, switching process.");
+            System.out.println("Process.cooperate: Process " + this.getClass().getSimpleName()
+                    + " is expired, switching process.");
             isExpired = false;
             OS.switchProcess();
+
         } else {
-            System.out.println("Process.cooperate: Process " + this.getClass().getSimpleName() + " cooperating.");
+            System.out.println("Process.cooperate: Process " + this.getClass().getSimpleName()
+                    + " cooperating.");
         }
     }
 }

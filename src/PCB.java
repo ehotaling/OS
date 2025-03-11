@@ -5,6 +5,7 @@ public class PCB { // Process Control Block
     private OS.PriorityType priority;
     private int timeoutCount; // tracks consecutive timeouts
     public long wakeupTime;
+    public int[] openDevices; // array to track open device VFS ids; -1 means empty
 
     // Only kernel should manage PCB's
     PCB(UserlandProcess up, OS.PriorityType priority) {
@@ -18,20 +19,16 @@ public class PCB { // Process Control Block
         this.priority = priority;
         this.timeoutCount = 0;
 
-//        if (!up.thread.isAlive()) {
-//            System.out.println("PCB: Process thread is not alive, starting thread for: "
-//                    + up.getClass().getSimpleName() + ", PID: " + pid);
-//            up.thread.start();
-//            System.out.println("PCB: Thread started for: "
-//                    + up.getClass().getSimpleName() + ", PID: " + pid);
-//        } else {
-//            System.out.println("PCB: Process thread is already alive for: "
-//                    + up.getClass().getSimpleName() + ", PID: " + pid);
-//        }
+        // allocate openDevices array with 10 slots and initialize each slot to -1
+        openDevices = new int[10];
+        for (int i = 0; i < openDevices.length; i++) {
+            openDevices[i] = -1;
+        }
 
         System.out.println("PCB: PCB created for: "
                 + up.getClass().getSimpleName() + ", PID: " + pid);
     }
+
 
     // increments the consecutive timeouts counter
     public void incrementTimeoutCount() {
@@ -42,10 +39,6 @@ public class PCB { // Process Control Block
         }
     }
 
-    // Provide an accessor so Scheduler can see if we crossed the demotion threshold
-    public int getTimeoutCount() {
-        return timeoutCount;
-    }
 
     // resets the consecutive timeouts counter
     public void resetTimeoutCount() {
@@ -66,7 +59,6 @@ public class PCB { // Process Control Block
         userlandProcess.requestStop();
     }
 
-    // calls userlandProcess’ stop. Loops with Thread.sleep() until ulp.isStopped() is true.
     public void stop() throws InterruptedException {
         userlandProcess.stop();
     }
@@ -78,10 +70,11 @@ public class PCB { // Process Control Block
 
     // calls userlandprocess’ start()
     void start() {
-        System.out.println("PCB.start: Starting process: "
-                + userlandProcess.getClass().getSimpleName()
-                + ", PID: " + pid);
         userlandProcess.start();
+    }
+
+    public void exit() {
+        userlandProcess.exit();
     }
 
     private void demotePriority() {
