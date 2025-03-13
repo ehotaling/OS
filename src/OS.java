@@ -8,28 +8,26 @@ public class OS {
     private static Kernel ki;
     // list for system call parameters
     public static List<Object> parameters = new ArrayList<>();
-    // return value for system calls
+
+    public static final Object retValLock = new Object();
     public static Object retVal;
+
     // enum for system call types
     public enum CallType {SwitchProcess, SendMessage, Open, Close, Read, Seek, Write, GetMapping, CreateProcess, Sleep, GetPID, AllocateMemory, FreeMemory, GetPIDByName, WaitForMessage, Exit}
+
     // current system call type
     public static CallType currentCall;
-
 
 
     // start kernel
     private static void startTheKernel() throws InterruptedException {
         if (ki != null) {
             ki.start();
-            if (ki.getScheduler().getCurrentlyRunning() != null) {
-                ki.getScheduler().getCurrentlyRunning().stop();
-            }
         }
     }
 
     // startup OS with init process and initialize kernel and scheduler
     public static void Startup(UserlandProcess init) throws InterruptedException {
-        System.out.println("OS.Startup: OS Startup initiated");
         System.out.println("OS.Startup: Initializing Kernel");
         ki = new Kernel();
         // pass kernel reference to scheduler
@@ -56,14 +54,16 @@ public class OS {
 
     public static int CreateProcess(UserlandProcess up, PriorityType priority) throws InterruptedException {
         System.out.println("OS.CreateProcess: Request to create process " + up.getClass().getSimpleName() + " with priority " + priority);
-        parameters.clear();
-        parameters.add(up);
-        parameters.add(priority);
-        currentCall = CallType.CreateProcess;
-        startTheKernel();
-        System.out.println("OS.CreateProcess: Waiting for retVal for process " + up.getClass().getSimpleName());
-        while (retVal == null) {
-            Thread.sleep(10);
+        synchronized (retValLock) {
+            parameters.clear();
+            parameters.add(up);
+            parameters.add(priority);
+            currentCall = CallType.CreateProcess;
+            startTheKernel();
+            System.out.println("OS.CreateProcess: Waiting for retVal for process " + up.getClass().getSimpleName());
+            while (retVal == null) {
+                retValLock.wait();
+            }
         }
         System.out.println("OS.CreateProcess: retVal received: " + retVal + " for process " + up.getClass().getSimpleName());
         int result = (int) retVal;
@@ -89,7 +89,8 @@ public class OS {
         while (retVal == null) {
             try {
                 Thread.sleep(10);
-            } catch (InterruptedException _) {}
+            } catch (InterruptedException _) {
+            }
         }
         return (int) retVal;
     }
@@ -119,7 +120,8 @@ public class OS {
         while (retVal == null) {
             try {
                 Thread.sleep(10);
-            } catch (InterruptedException e) {}
+            } catch (InterruptedException e) {
+            }
         }
         return (int) retVal;
     }
@@ -163,7 +165,8 @@ public class OS {
         while (retVal == null) {
             try {
                 Thread.sleep(10);
-            } catch (InterruptedException e) {}
+            } catch (InterruptedException e) {
+            }
         }
         return (int) retVal;
     }

@@ -14,6 +14,8 @@ public abstract class Process implements Runnable{
     private boolean exited = false;
 
 
+
+
     public Process() {
         System.out.println("Process: Process constructor for: " + this.getClass().getSimpleName()); // Debug print
         this.thread = new Thread(this);
@@ -41,20 +43,20 @@ public abstract class Process implements Runnable{
 
     // true when the Java thread is not alive
     public boolean isDone() {
-        return exited || !thread.isAlive();
+        return exited;
     }
 
     // releases (increments) the semaphore, allowing this thread to run
     public void start() {
-        available.release();
         if (!thread.isAlive()) {
             thread.start();
         }
+        available.release();
     }
 
 
     // acquires (decrements) the semaphore, stopping this thread from running
-    public void stop() throws InterruptedException {
+    public void stop() {
         System.out.println("Process.stop: Stopping process: " + this.getClass().getSimpleName()); // Debug print
         try {
             available.acquire();
@@ -82,6 +84,7 @@ public abstract class Process implements Runnable{
             System.out.println("Process.cooperate: Process " + this.getClass().getSimpleName()
                     + " is expired, switching process.");
             isExpired = false;
+            this.stop();
             OS.switchProcess();
 
         } else {

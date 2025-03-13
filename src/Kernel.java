@@ -19,9 +19,14 @@ public class Kernel extends Process implements Device {
                 switch (OS.currentCall) {
                     case CreateProcess -> {
                         System.out.println("Kernel.main: System call is CreateProcess");
-                        OS.retVal = CreateProcess((UserlandProcess) OS.parameters.get(0), (OS.PriorityType) OS.parameters.get(1));
-                        System.out.println("Kernel.main: CreateProcess returned PID: " + OS.retVal);
+                        int pid = CreateProcess((UserlandProcess) OS.parameters.get(0), (OS.PriorityType) OS.parameters.get(1));
+                        synchronized(OS.retValLock) {
+                            OS.retVal = pid;
+                            System.out.println("Kernel.main: CreateProcess returned PID: " + OS.retVal);
+                            OS.retValLock.notifyAll();
+                        }
                     }
+
                     case SwitchProcess -> {
                         System.out.println("Kernel.main: System call is SwitchProcess");
                         SwitchProcess();
@@ -63,9 +68,9 @@ public class Kernel extends Process implements Device {
                 }
             }
             // clear system call state so that it is not re-processed
+            System.out.println("Kernel: Done with " + OS.currentCall + " call");
             OS.currentCall = null;
             OS.parameters.clear();
-            scheduler.switchProcess();
             this.stop();
         }
 

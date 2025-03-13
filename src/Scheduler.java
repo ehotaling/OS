@@ -78,7 +78,7 @@ public class Scheduler {
 
         // If no process is currently running, start the first created process
         if (runningProcess == null) {
-            System.out.println("Scheduler.createProcess: No running process, calling switchProcess");
+            System.out.println("Scheduler.createProcess: No running process, switching process");
             switchProcess();
         }
 
@@ -99,6 +99,7 @@ public class Scheduler {
 
         // Select the next process to run
         runningProcess = selectProcess();
+        System.out.println("Scheduler.switchProcess: Selected " + runningProcess.userlandProcess.getClass().getSimpleName());
 
         // If no process was selected, use an IdleProcess
         if (runningProcess == null) {
@@ -123,6 +124,7 @@ public class Scheduler {
             case interactive -> interactiveQueue.add(process);
             case background -> backgroundQueue.add(process);
         }
+        System.out.println("Scheduler.createProcess: Adding process " + process.userlandProcess.getClass().getSimpleName() + " to queue: " + p);
     }
 
     // helper to add process to queue using its current priority
@@ -132,6 +134,7 @@ public class Scheduler {
             case interactive -> interactiveQueue.add(process);
             case background -> backgroundQueue.add(process);
         }
+        System.out.println("Scheduler.createProcess: Adding process " + process.getClass().getSimpleName() + " to queue: " + process.getPriority());
     }
 
     // Select next process using probabilistic model
@@ -147,9 +150,15 @@ public class Scheduler {
         }
 
         if (!interactiveQueue.isEmpty()) {
-            if (randomDouble < 0.75) return pollNext(interactiveQueue); // 75% for interactive
-            return pollNextBackground(); // 25% for background
+            if (randomDouble < 0.75) {
+                return pollNext(interactiveQueue); // Prefer interactive
+            } else {
+                PCB process = pollNextBackground();
+                // Fallback to interactive if no background process is available
+                return process != null ? process : pollNext(interactiveQueue);
+            }
         }
+
 
         return pollNextBackground(); // Only background processes left
     }
