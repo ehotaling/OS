@@ -1,71 +1,75 @@
 import java.util.concurrent.Semaphore;
 
-public abstract class Process implements Runnable{
+public abstract class Process implements Runnable {
 
-    // Each process should have a Java Thread and a Semaphore
-    public Thread thread = new Thread(this);
-
-    // Start at 0 so it the process doesn't run immediately
+    // Thread for running this process. In our OS simulator, each process is represented as a Java Thread.
+    public Thread thread;
+    // Semaphore used to pause and resume process execution. It helps simulate cooperative multitasking.
+    // The process will block (pause) when the semaphore's permit count is 0.
     final Semaphore available = new Semaphore(0);
-
+    // Flag indicating that the process's time quantum has expired.
+    // When set to true, the process should yield control.
     public boolean isExpired = false;
-
-   // flag to indicate termination.
+    // Flag to mark that the process has exited (finished execution).
     private boolean exited = false;
 
-
-
-
+    // Process constructor.
+    // Initializes the thread for the process and prints debug info.
     public Process() {
-        System.out.println("Process: Process constructor for: " + this.getClass().getSimpleName()); // Debug print
+        System.out.println("Process: Process constructor for: " + this.getClass().getSimpleName());
         this.thread = new Thread(this);
     }
 
+    // Marks the process as exited.
+    // This method is called when the process wants to indicate it is done.
     public void exit() {
         exited = true;
-
     }
 
-
-    // sets the boolean indicating that this process’ quantum has expired
+    // Called when the scheduler’s timer interrupts.
+    // Sets the flag indicating that the process’s quantum has expired.
     public void requestStop() {
-        System.out.println("Process.requestStop: Request stop for process: " + this.getClass().getSimpleName()); // Debug print
+        System.out.println("Process.requestStop: Request stop for process: " + this.getClass().getSimpleName());
         isExpired = true;
     }
 
-    // will represent the main of our “program”
-    public abstract void main() throws InterruptedException;
-
-    // indicates if the semaphore is 0
+    // Checks if the process is currently stopped.
+    // It returns true when no permits are available on the semaphore.
     public boolean isStopped() {
         return available.availablePermits() == 0;
     }
 
-    // true when the Java thread is not alive
+    // Checks if the process has been marked as exited.
+    // A process is considered done if it has called exit() and finished its execution.
     public boolean isDone() {
         return exited;
     }
 
-    // releases (increments) the semaphore, allowing this thread to run
+    // Starts the process if its thread is not already alive.
+    // This method starts the thread and releases a permit so that the process can begin execution.
+    // It simulates the OS starting a new userland process.
     public void start() {
         if (!thread.isAlive()) {
             thread.start();
+            available.release();
         }
-        available.release();
     }
 
-
-    // acquires (decrements) the semaphore, stopping this thread from running
+    // Stops (pauses) the process by acquiring a permit from the semaphore.
+    // This effectively blocks the process until the semaphore is released again by the scheduler.
     public void stop() {
-        System.out.println("Process.stop: Stopping process: " + this.getClass().getSimpleName()); // Debug print
+        System.out.println("Process.stop: Stopping process: " + this.getClass().getSimpleName());
         try {
             available.acquire();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
-        System.out.println("Process.stop: Process stopped: " + this.getClass().getSimpleName() + ", now has permits: " + available.availablePermits());
+        System.out.println("Process.stop: Process stopped: " + this.getClass().getSimpleName() +
+                ", now has permits: " + available.availablePermits());
     }
 
+    // The run() method is invoked when the process's thread starts.
+    // It waits (by acquiring the semaphore) until the process is allowed to run, then calls its main() method.
     @Override
     public void run() {
         System.out.println("Process.run: Run method invoked for process: " + this.getClass().getSimpleName());
@@ -77,8 +81,13 @@ public abstract class Process implements Runnable{
         }
     }
 
+    // Abstract main() method that each subclass must implement.
+    // This method represents the process's main logic (like the main() function in traditional programs).
+    public abstract void main() throws InterruptedException;
 
-    // When the process's quantum is expired, cooperate() calls OS.switchProcess()
+    // Cooperative multitasking method.
+    // If the process's quantum is expired, it stops itself and yields control by calling OS.switchProcess().
+    // Otherwise, it prints a message indicating it is cooperating (i.e., continuing execution).
     public void cooperate() throws InterruptedException {
         if (isExpired) {
             System.out.println("Process.cooperate: Process " + this.getClass().getSimpleName()
@@ -86,10 +95,8 @@ public abstract class Process implements Runnable{
             isExpired = false;
             this.stop();
             OS.switchProcess();
-
         } else {
-            System.out.println("Process.cooperate: Process " + this.getClass().getSimpleName()
-                    + " cooperating.");
+            System.out.println("Process.cooperate: Process " + this.getClass().getSimpleName() + " cooperating.");
         }
     }
 }

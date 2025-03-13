@@ -15,7 +15,6 @@ public class TestInitProcess extends UserlandProcess {
         }
         // yield control repeatedly so that other processes can run
         while (true) {
-            System.out.println("TestInitProcess: Calling OS.Sleep");
             OS.Sleep(500); // sleep to yield control
         }
     }

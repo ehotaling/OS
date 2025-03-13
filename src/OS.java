@@ -1,217 +1,259 @@
 // OS.java
+// This file serves as the gateway between the userland thread and the kernel thread.
+// It implements system call interfaces for process management and device I/O.
+// Many subsequent assignments depend on the correct implementation and testing of these system calls.
+//
+// - Devices can be diverse (disks, video, sound, virtual devices, etc.) and must be managed uniformly
+//   through a standardized interface (open, close, read, seek, write).
+// - The OS must track open devices per process and ensure that on process termination,
+//   all device resources are released.
+// - Kernel calls need to safely cross the kernel–userland boundary.
+// - The kernel, PCB modifications, and Virtual File System (VFS) must correctly map user calls
+//   to device-specific implementations.
+
 import java.util.ArrayList;
 import java.util.List;
 
 public class OS {
 
-    // kernel instance
+    // The one and only instance of the kernel.
     private static Kernel ki;
-    // list for system call parameters
+
+    // List used to pass system call parameters between userland and kernel.
+    // (This list is reused for each call, so it must be cleared before adding new parameters.)
     public static List<Object> parameters = new ArrayList<>();
 
-    // A lock for all system calls and a reference to the current result
-    public static final Object sysCallLock = new Object();
-    public static SysCallResult currentSysCallResult;
 
-    // enum for system call types
+    // Shared return value for system calls. Kernel writes to this and userland waits for it.
+    public static Object retVal;
+
+    // Enum defining the types of system calls. Includes process management calls and device I/O operations.
     public enum CallType {
         SwitchProcess, SendMessage, Open, Close, Read, Seek, Write,
         GetMapping, CreateProcess, Sleep, GetPID, AllocateMemory,
         FreeMemory, GetPIDByName, WaitForMessage, Exit
     }
-    // current system call type
+    // Indicates the current system call type being processed.
     public static CallType currentCall;
 
+    // Priority types for process creation; used to determine scheduling behavior.
     public enum PriorityType { realtime, interactive, background }
 
-    // start the kernel (if not null)
+    // Starts the kernel thread if it is not null.
+    // This is invoked before making any system call to ensure the kernel is running.
     private static void startTheKernel() throws InterruptedException {
         if (ki != null) {
             ki.start();
         }
     }
 
-    // Startup: initialize the kernel and create the init process
+    // Startup method to initialize the kernel and create the initial process.
+    // This corresponds to the OS bootstrapping and must be done before any other process operations.
+    // 'init' is the initial userland process to be created.
     public static void Startup(UserlandProcess init) throws InterruptedException {
         System.out.println("OS.Startup: Initializing Kernel");
         ki = new Kernel();
-        // pass kernel reference to scheduler
+        Thread.sleep(2);
+        // Pass kernel reference to scheduler, which will later manage the PCB (including tracking open device ids)
         ki.getScheduler().setKernel(ki);
         System.out.println("OS.Startup: Kernel initialized");
-        System.out.println("OS.Startup: Creating InitProcess");
-        int pid = CreateProcess(init, PriorityType.interactive);
-        System.out.println("OS.Startup: InitProcess created with PID " + pid);
+        System.out.println("OS.Startup: Creating TestInitProcess");
+        CreateProcess(init, PriorityType.interactive);
+        // Ensure the kernel has time to start properly and provide a return value.
+        while (retVal == null) {
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+        System.out.println("OS.Startup: InitProcess created with PID " + retVal);
     }
 
-    // CreateProcess without explicit priority uses interactive
+    // CreateProcess without explicit priority; defaults to an interactive process.
+    // 'up' is the userland process instance.
+    // Returns the process ID (PID) assigned.
     public static int CreateProcess(UserlandProcess up) throws InterruptedException {
         return CreateProcess(up, PriorityType.interactive);
     }
 
-    // CreateProcess: use a per‑call result object so each call waits for its own result.
+    // CreateProcess with an explicit priority.
+    // Clears previous parameters, adds the userland process and its priority to the parameters list,
+    // sets the current system call type to CreateProcess, and starts the kernel thread if needed.
+    // Waits for a return value (PID) from the kernel.
     public static int CreateProcess(UserlandProcess up, PriorityType priority) throws InterruptedException {
-        SysCallResult result = new SysCallResult();
-        synchronized(sysCallLock) {
-            parameters.clear();
-            parameters.add(up);
-            parameters.add(priority);
-            currentCall = CallType.CreateProcess;
-            currentSysCallResult = result;
-            startTheKernel();
-        }
+        parameters.clear();
+        parameters.add(up);
+        parameters.add(priority);
+        currentCall = CallType.CreateProcess;
+        startTheKernel();
         System.out.println("OS.CreateProcess: Waiting for retVal for process " + up.getClass().getSimpleName());
-        result.latch.await();  // block until the kernel sets the value
-        int pid = (int) result.value;
-        synchronized(sysCallLock) {
-            currentSysCallResult = null;
+        while (retVal == null) {
+            Thread.sleep(10);
         }
-        System.out.println("OS.CreateProcess: Returning PID " + pid + " for process " + up.getClass().getSimpleName());
-        return pid;
+        System.out.println("OS.CreateProcess: Returning PID " + retVal + " for process " + up.getClass().getSimpleName());
+        int result = (int) retVal;
+        retVal = null;  // Reset shared return value for subsequent calls.
+        return result;
     }
 
+    // switchProcess: Requests a process switch.
+    // Debug prints are used for tracing; clears parameters and sets the system call type.
     public static void switchProcess() throws InterruptedException {
-        System.out.println("OS.switchProcess: Switch process requested.");
-        synchronized(sysCallLock) {
-            parameters.clear();
-            currentCall = CallType.SwitchProcess;
-            startTheKernel();
-        }
-        System.out.println("OS.switchProcess: startTheKernel() returned.");
+        System.out.println("OS.switchProcess: Switch process requested."); // Debug print
+        parameters.clear();
+        currentCall = CallType.SwitchProcess;
+        startTheKernel();
+        System.out.println("OS.switchProcess: startTheKernel() returned."); // Debug print
     }
 
+    // GetPID: Retrieves the current process ID.
+    // Sets the system call type, starts the kernel, and waits until the kernel returns the PID.
+    // Returns the current process's PID.
     public static int GetPID() throws InterruptedException {
-        SysCallResult result = new SysCallResult();
-        synchronized(sysCallLock) {
-            parameters.clear();
-            currentCall = CallType.GetPID;
-            currentSysCallResult = result;
-            startTheKernel();
+        parameters.clear();
+        currentCall = CallType.GetPID;
+        startTheKernel();
+        while (retVal == null) {
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException _) {}
         }
-        result.latch.await();
-        int pid = (int) result.value;
-        synchronized(sysCallLock) {
-            currentSysCallResult = null;
-        }
-        return pid;
+        return (int) retVal;
     }
 
+    // Exit: Processes the exit system call.
+    // On process termination, the kernel must ensure that all open devices are closed as per the assignment instructions.
     public static void Exit() throws InterruptedException {
         System.out.println("OS.Exit: Exit system call requested");
-        synchronized(sysCallLock) {
-            parameters.clear();
-            currentCall = CallType.Exit;
-            startTheKernel();
-        }
+        parameters.clear();
+        currentCall = CallType.Exit;
+        startTheKernel();
         System.out.println("OS.Exit: startTheKernel returned");
     }
 
+    // Sleep: Pauses process execution for the specified number of milliseconds.
+    // The sleep duration is passed to the kernel as a parameter.
     public static void Sleep(int mills) throws InterruptedException {
-        synchronized(sysCallLock) {
-            parameters.clear();
-            parameters.add(mills);
-            currentCall = CallType.Sleep;
-            startTheKernel();
-        }
+        parameters.clear();
+        parameters.add(mills);
+        currentCall = CallType.Sleep;
+        startTheKernel();
     }
 
-    // Device calls
+    // ***** Device Calls *****
+    // These methods implement the standard device I/O system calls.
+    // Each device (e.g., RandomDevice, FakeFileSystem) implements the Device interface with open(), close(), read(), seek(), and write().
+    // The OS methods below pass the call through to the kernel, which uses the Virtual File System (VFS) to route the request.
 
+    // Open: Performs a device open system call.
+    // Accepts a String parameter which may be a filename or a seed (for RandomDevice),
+    // and calls the kernel, which delegates to the VFS.
+    // Returns the device id (or VFS index) returned by the kernel.
     public static int Open(String s) throws InterruptedException {
-        SysCallResult result = new SysCallResult();
-        synchronized(sysCallLock) {
-            parameters.clear();
-            parameters.add(s);
-            currentCall = CallType.Open;
-            currentSysCallResult = result;
-            startTheKernel();
+        parameters.clear();
+        parameters.add(s);
+        currentCall = CallType.Open;
+        startTheKernel();
+        while (retVal == null) {
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException e) {}
         }
-        result.latch.await();
-        int ret = (int) result.value;
-        synchronized(sysCallLock) {
-            currentSysCallResult = null;
-        }
-        return ret;
+        return (int) retVal;
     }
 
+    // Close: Performs a device close system call.
+    // Clears parameters, adds the device id, sets the system call type,
+    // and calls the kernel to handle the closure (including cleaning up PCB entries).
     public static void Close(int id) throws InterruptedException {
-        synchronized(sysCallLock) {
-            parameters.clear();
-            parameters.add(id);
-            currentCall = CallType.Close;
-            startTheKernel();
-        }
+        parameters.clear();
+        parameters.add(id);
+        currentCall = CallType.Close;
+        startTheKernel();
     }
 
+    // Read: Performs a device read system call.
+    // Sends the device id and the number of bytes to read to the kernel,
+    // which then delegates the call to the appropriate device via the VFS.
+    // Returns a byte array containing the data read.
     public static byte[] Read(int id, int size) throws InterruptedException {
-        SysCallResult result = new SysCallResult();
-        synchronized(sysCallLock) {
-            parameters.clear();
-            parameters.add(id);
-            parameters.add(size);
-            currentCall = CallType.Read;
-            currentSysCallResult = result;
-            startTheKernel();
+        parameters.clear();
+        parameters.add(id);
+        parameters.add(size);
+        currentCall = CallType.Read;
+        startTheKernel();
+        while (retVal == null) {
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException _) {}
         }
-        result.latch.await();
-        byte[] ret = (byte[]) result.value;
-        synchronized(sysCallLock) {
-            currentSysCallResult = null;
-        }
-        return ret;
+        return (byte[]) retVal;
     }
 
+    // Seek: Performs a device seek system call.
+    // Instructs the device to adjust its internal pointer to a specified position.
     public static void Seek(int id, int to) throws InterruptedException {
-        synchronized(sysCallLock) {
-            parameters.clear();
-            parameters.add(id);
-            parameters.add(to);
-            currentCall = CallType.Seek;
-            startTheKernel();
-        }
+        parameters.clear();
+        parameters.add(id);
+        parameters.add(to);
+        currentCall = CallType.Seek;
+        startTheKernel();
     }
 
+    // Write: Performs a device write system call.
+    // Sends data to the device and waits for a return value indicating the number of bytes written.
+    // Returns the number of bytes written.
     public static int Write(int id, byte[] data) throws InterruptedException {
-        SysCallResult result = new SysCallResult();
-        synchronized(sysCallLock) {
-            parameters.clear();
-            parameters.add(id);
-            parameters.add(data);
-            currentCall = CallType.Write;
-            currentSysCallResult = result;
-            startTheKernel();
+        parameters.clear();
+        parameters.add(id);
+        parameters.add(data);
+        currentCall = CallType.Write;
+        startTheKernel();
+        while (retVal == null) {
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException e) {}
         }
-        result.latch.await();
-        int ret = (int) result.value;
-        synchronized(sysCallLock) {
-            currentSysCallResult = null;
-        }
-        return ret;
+        return (int) retVal;
     }
 
-    // Message calls (stubs)
+    // ***** Message Calls (Stubs) *****
+    // Placeholders for message-passing functionality which may be implemented in future assignments.
 
+    // SendMessage: Stub for sending a kernel message.
     public static void SendMessage(KernelMessage km) {
         // implementation pending
     }
 
+    // WaitForMessage: Stub for receiving a kernel message.
+    // Returns a KernelMessage object, or null if not implemented.
     public static KernelMessage WaitForMessage() {
         return null;
     }
 
+    // GetPidByName: Stub for a method that would return a PID given a process name.
+    // Currently returns 0 as implementation is pending.
     public static int GetPidByName(String name) {
         return 0; // implementation pending
     }
 
-    // Memory calls (stubs)
+    // ***** Memory Calls (Stubs) *****
+    // Placeholders for future memory management features such as mapping, allocation, and freeing of memory.
 
+    // GetMapping: Stub for obtaining the mapping for a virtual page.
     public static void GetMapping(int virtualPage) {
         // implementation pending
     }
 
+    // AllocateMemory: Stub for memory allocation.
+    // Returns an identifier for the allocated memory (currently 0 as implementation is pending).
     public static int AllocateMemory(int size) {
         return 0; // implementation pending
     }
 
+    // FreeMemory: Stub for freeing allocated memory.
+    // Returns true if the memory was freed successfully, false otherwise.
     public static boolean FreeMemory(int pointer, int size) {
         return false; // implementation pending
     }
