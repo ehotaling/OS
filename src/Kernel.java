@@ -20,12 +20,15 @@ public class Kernel extends Process implements Device {
                     case CreateProcess -> {
                         System.out.println("Kernel.main: System call is CreateProcess");
                         int pid = CreateProcess((UserlandProcess) OS.parameters.get(0), (OS.PriorityType) OS.parameters.get(1));
-                        synchronized(OS.retValLock) {
-                            OS.retVal = pid;
-                            System.out.println("Kernel.main: CreateProcess returned PID: " + OS.retVal);
-                            OS.retValLock.notifyAll();
+                        System.out.println("Kernel.main: CreateProcess returned PID: " + pid);
+                        synchronized(OS.sysCallLock) {
+                            if (OS.currentSysCallResult != null) {
+                                OS.currentSysCallResult.value = pid;
+                                OS.currentSysCallResult.latch.countDown();
+                            }
                         }
                     }
+
 
                     case SwitchProcess -> {
                         System.out.println("Kernel.main: System call is SwitchProcess");

@@ -9,8 +9,9 @@ public class OS {
     // list for system call parameters
     public static List<Object> parameters = new ArrayList<>();
 
-    public static final Object retValLock = new Object();
-    public static Object retVal;
+    public static final Object sysCallLock = new Object();
+    public static SysCallResult currentSysCallResult;
+
 
     // enum for system call types
     public enum CallType {SwitchProcess, SendMessage, Open, Close, Read, Seek, Write, GetMapping, CreateProcess, Sleep, GetPID, AllocateMemory, FreeMemory, GetPIDByName, WaitForMessage, Exit}
@@ -53,24 +54,27 @@ public class OS {
     }
 
     public static int CreateProcess(UserlandProcess up, PriorityType priority) throws InterruptedException {
-        System.out.println("OS.CreateProcess: Request to create process " + up.getClass().getSimpleName() + " with priority " + priority);
-        synchronized (retValLock) {
+        SysCallResult result = new SysCallResult();
+        synchronized(sysCallLock) {
             parameters.clear();
             parameters.add(up);
             parameters.add(priority);
             currentCall = CallType.CreateProcess;
+            currentSysCallResult = result; // store this result so the kernel can access it
             startTheKernel();
-            System.out.println("OS.CreateProcess: Waiting for retVal for process " + up.getClass().getSimpleName());
-            while (retVal == null) {
-                retValLock.wait();
-            }
         }
-        System.out.println("OS.CreateProcess: retVal received: " + retVal + " for process " + up.getClass().getSimpleName());
-        int result = (int) retVal;
-        retVal = null;
-        System.out.println("OS.CreateProcess: Returning PID " + result + " for process " + up.getClass().getSimpleName());
-        return result;
+        System.out.println("OS.CreateProcess: Waiting for retVal for process " + up.getClass().getSimpleName());
+        // Wait until the kernel sets the result
+        result.latch.await();
+        int pid = (int) result.value;
+        synchronized(sysCallLock) {
+            currentSysCallResult = null;
+        }
+        System.out.println("OS.CreateProcess: Returning PID " + pid + " for process " + up.getClass().getSimpleName());
+        return pid;
     }
+
+
 
 
     public static void switchProcess() throws InterruptedException {
