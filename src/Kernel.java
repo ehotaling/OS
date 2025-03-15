@@ -23,7 +23,6 @@ public class Kernel extends Process implements Device {
         while (true) {
             // Check if there is a pending system call from the OS.
             if (OS.currentCall != null) {
-                System.out.println("Kernel.main: Processing system call: " + OS.currentCall);
                 // Process the system call based on its type.
                 switch (OS.currentCall) {
                     case CreateProcess -> {
@@ -36,11 +35,13 @@ public class Kernel extends Process implements Device {
                         System.out.println("Kernel.main: System call is SwitchProcess");
                         // Switch to the next process using the scheduler.
                         SwitchProcess();
+                        OS.retVal = 1;
                     }
                     case Sleep -> {
                         System.out.println("Kernel.main: System call is Sleep");
                         // Pause the current process for a specified duration.
                         Sleep((int) OS.parameters.get(0));
+                        OS.retVal = 1;
                     }
                     case GetPID -> {
                         System.out.println("Kernel.main: System call is GetPID");
@@ -51,6 +52,7 @@ public class Kernel extends Process implements Device {
                         System.out.println("Kernel.main: System call is Exit");
                         // Handle process exit: mark the process as done, remove it from the scheduler, and switch.
                         Exit();
+                        OS.retVal = 1;
                     }
                     // Device system calls:
                     case Open -> {
@@ -62,6 +64,7 @@ public class Kernel extends Process implements Device {
                         System.out.println("Kernel.main: System call is Close");
                         // Close a device and free its slot in the current process.
                         close((int) OS.parameters.get(0));
+                        OS.retVal = 1;
                     }
                     case Read -> {
                         System.out.println("Kernel.main: System call is Read");
@@ -72,6 +75,7 @@ public class Kernel extends Process implements Device {
                         System.out.println("Kernel.main: System call is Seek");
                         // Change the read/write position for a device.
                         seek((int) OS.parameters.get(0), (int) OS.parameters.get(1));
+                        OS.retVal = 1;
                     }
                     case Write -> {
                         System.out.println("Kernel.main: System call is Write");
@@ -85,11 +89,17 @@ public class Kernel extends Process implements Device {
                 }
             }
             if (OS.currentCall != null) {
-                System.out.println("Kernel: Done with " + OS.currentCall + " call");
             }
             // Reset the current system call and clear the parameters for the next call.
             OS.currentCall = null;
             OS.parameters.clear();
+            // Once the OS call is processed, hand over control:
+            // If a process is scheduled to run, start it.
+            if (scheduler.getCurrentlyRunning() != null) {
+                System.out.println("Kernel: Starting " + scheduler.getCurrentlyRunning().userlandProcess.getClass().getSimpleName());
+                scheduler.getCurrentlyRunning().start();
+            }
+            this.stop();
         }
     }
 
@@ -97,7 +107,6 @@ public class Kernel extends Process implements Device {
 
     // SwitchProcess: Delegates process switching to the scheduler.
     private void SwitchProcess() throws InterruptedException {
-        System.out.println("Kernel.SwitchProcess: Switching process via scheduler");
         scheduler.switchProcess();
     }
 
@@ -124,15 +133,13 @@ public class Kernel extends Process implements Device {
 
     // GetPid: Returns the PID of the currently running process.
     private int GetPid() {
-        System.out.println("Kernel.GetPid: Getting PID of running process");
         int pid = (scheduler.runningProcess != null) ? scheduler.runningProcess.pid : -1;
-        System.out.println("Kernel.GetPid: Returning PID: " + pid);
         return pid;
     }
 
     // Device system calls using VFS:
 
-    // open: Opens a device (e.g., file, random device) based on the provided string.
+    // open: Opens a device like a file or random device based on the provided string.
     // It finds an available slot in the current process's openDevices array.
     @Override
     public int open(String s) {
@@ -233,7 +240,7 @@ public class Kernel extends Process implements Device {
     }
 
     // forceCloseDevice: Forces closure of a device for a given process and device slot.
-    // This is useful for cleaning up open device entries when a process terminates.
+    // for cleaning up open device entries when a process terminates.
     public void forceCloseDevice(PCB process, int deviceSlot) {
         if (process == null || deviceSlot < 0 || deviceSlot >= process.openDevices.length) return;
         int vfsId = process.openDevices[deviceSlot];

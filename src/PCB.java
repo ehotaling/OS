@@ -87,4 +87,8 @@ public class PCB { // Process Control Block
         System.out.println("Scheduler.demote: Process " + pid
                 + " demoted from " + oldPriority + " to " + priority);
     }
+
+    public void startThread() {
+        userlandProcess.startThread();
+    }
 }

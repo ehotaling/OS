@@ -9,9 +9,10 @@ public abstract class Process implements Runnable {
     final Semaphore available = new Semaphore(0);
     // Flag indicating that the process's time quantum has expired.
     // When set to true, the process should yield control.
-    public boolean isExpired = false;
+    public volatile boolean isExpired = false;
     // Flag to mark that the process has exited (finished execution).
-    private boolean exited = false;
+    public volatile boolean exited = false;
+
 
     // Process constructor.
     // Initializes the thread for the process and prints debug info.
@@ -23,8 +24,12 @@ public abstract class Process implements Runnable {
     // Marks the process as exited.
     // This method is called when the process wants to indicate it is done.
     public void exit() {
+        System.out.println("Process.exit: Exiting process: " + this.getClass().getSimpleName());
         exited = true;
+        // Release a permit so that any blocked acquire (in run() or stop()) can continue.
+        available.release();
     }
+
 
     // Called when the scheduler’s timer interrupts.
     // Sets the flag indicating that the process’s quantum has expired.
@@ -39,26 +44,27 @@ public abstract class Process implements Runnable {
         return available.availablePermits() == 0;
     }
 
-    // Checks if the process has been marked as exited.
+    // Checks if the process has been marked as exited or the thread is not alive.
     // A process is considered done if it has called exit() and finished its execution.
     public boolean isDone() {
-        return exited;
+        return exited || !thread.isAlive();
     }
 
-    // Starts the process if its thread is not already alive.
+
+    // Starts the process
     // This method starts the thread and releases a permit so that the process can begin execution.
     // It simulates the OS starting a new userland process.
     public void start() {
+        System.out.println("Process.start: Starting process: " + this.getClass().getSimpleName());
         if (!thread.isAlive()) {
             thread.start();
-            available.release();
         }
+        available.release();
     }
 
     // Stops (pauses) the process by acquiring a permit from the semaphore.
     // This effectively blocks the process until the semaphore is released again by the scheduler.
     public void stop() {
-        System.out.println("Process.stop: Stopping process: " + this.getClass().getSimpleName());
         try {
             available.acquire();
         } catch (InterruptedException e) {
@@ -75,11 +81,17 @@ public abstract class Process implements Runnable {
         System.out.println("Process.run: Run method invoked for process: " + this.getClass().getSimpleName());
         try {
             available.acquire();
+            if (exited) {
+                // If exit() was called before main() starts, simply return.
+                System.out.println("Process.run: Exit process: " + this.getClass().getSimpleName());
+                return;
+            }
             main();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
     }
+
 
     // Abstract main() method that each subclass must implement.
     // This method represents the process's main logic (like the main() function in traditional programs).
@@ -93,10 +105,28 @@ public abstract class Process implements Runnable {
             System.out.println("Process.cooperate: Process " + this.getClass().getSimpleName()
                     + " is expired, switching process.");
             isExpired = false;
-            this.stop();
             OS.switchProcess();
         } else {
-            System.out.println("Process.cooperate: Process " + this.getClass().getSimpleName() + " cooperating.");
+            System.out.println("Process.cooperate: Process " + this.getClass().getSimpleName() + " not expired.");
+        }
+    }
+
+    public boolean isAlive() {
+        return thread.isAlive();
+    }
+
+    public void resumeProcess() {
+        // This releases a permit regardless of the thread's alive state,
+        // ensuring that if the process is blocked, it can continue.
+        available.release();
+    }
+
+
+    // Make the thread alive but not running
+    public void startThread() {
+        if (!thread.isAlive()) {
+            System.out.println("Process.startThread: Starting thread: " + this.getClass().getSimpleName());
+            thread.start();
         }
     }
 }

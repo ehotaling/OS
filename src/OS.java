@@ -1,8 +1,6 @@
 // OS.java
 // This file serves as the gateway between the userland thread and the kernel thread.
 // It implements system call interfaces for process management and device I/O.
-// Many subsequent assignments depend on the correct implementation and testing of these system calls.
-//
 // - Devices can be diverse (disks, video, sound, virtual devices, etc.) and must be managed uniformly
 //   through a standardized interface (open, close, read, seek, write).
 // - The OS must track open devices per process and ensure that on process termination,
@@ -42,8 +40,27 @@ public class OS {
     // Starts the kernel thread if it is not null.
     // This is invoked before making any system call to ensure the kernel is running.
     private static void startTheKernel() throws InterruptedException {
-        if (ki != null) {
+        // Start the kernel thread if it is not already running.
+        if (!ki.isAlive()) {
             ki.start();
+        } else {
+            // Kernel is already alive but is blocked, so unblock it.
+            ki.resumeProcess();
+        }
+
+        // Yield control to the kernel:
+        // If the scheduler has a currently running process, stop that process.
+        if (ki.getScheduler() != null && ki.getScheduler().getCurrentlyRunning() != null) {
+            System.out.println("OS.startTheKernel: Stopping " + ki.getScheduler().getCurrentlyRunning().userlandProcess.getClass().getSimpleName() + " for a system call.");
+            ki.getScheduler().getCurrentlyRunning().stop();
+        }
+        // wait until the kernel completes its task and sets retVal.
+        while (retVal == null) {
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
         }
     }
 
@@ -53,21 +70,14 @@ public class OS {
     public static void Startup(UserlandProcess init) throws InterruptedException {
         System.out.println("OS.Startup: Initializing Kernel");
         ki = new Kernel();
-        Thread.sleep(2);
         // Pass kernel reference to scheduler, which will later manage the PCB (including tracking open device ids)
         ki.getScheduler().setKernel(ki);
         System.out.println("OS.Startup: Kernel initialized");
+        System.out.println("OS.Startup: Creating IdleProcess.");
+        CreateProcess(new IdleProcess(), PriorityType.background);
         System.out.println("OS.Startup: Creating TestInitProcess");
         CreateProcess(init, PriorityType.interactive);
-        // Ensure the kernel has time to start properly and provide a return value.
-        while (retVal == null) {
-            try {
-                Thread.sleep(10);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-        }
-        System.out.println("OS.Startup: InitProcess created with PID " + retVal);
+        System.out.println("OS.Startup: TestInitProcess created.");
     }
 
     // CreateProcess without explicit priority; defaults to an interactive process.
@@ -87,11 +97,6 @@ public class OS {
         parameters.add(priority);
         currentCall = CallType.CreateProcess;
         startTheKernel();
-        System.out.println("OS.CreateProcess: Waiting for retVal for process " + up.getClass().getSimpleName());
-        while (retVal == null) {
-            Thread.sleep(10);
-        }
-        System.out.println("OS.CreateProcess: Returning PID " + retVal + " for process " + up.getClass().getSimpleName());
         int result = (int) retVal;
         retVal = null;  // Reset shared return value for subsequent calls.
         return result;
@@ -100,11 +105,9 @@ public class OS {
     // switchProcess: Requests a process switch.
     // Debug prints are used for tracing; clears parameters and sets the system call type.
     public static void switchProcess() throws InterruptedException {
-        System.out.println("OS.switchProcess: Switch process requested."); // Debug print
         parameters.clear();
         currentCall = CallType.SwitchProcess;
         startTheKernel();
-        System.out.println("OS.switchProcess: startTheKernel() returned."); // Debug print
     }
 
     // GetPID: Retrieves the current process ID.
@@ -114,22 +117,15 @@ public class OS {
         parameters.clear();
         currentCall = CallType.GetPID;
         startTheKernel();
-        while (retVal == null) {
-            try {
-                Thread.sleep(10);
-            } catch (InterruptedException _) {}
-        }
         return (int) retVal;
     }
 
     // Exit: Processes the exit system call.
     // On process termination, the kernel must ensure that all open devices are closed as per the assignment instructions.
     public static void Exit() throws InterruptedException {
-        System.out.println("OS.Exit: Exit system call requested");
         parameters.clear();
         currentCall = CallType.Exit;
         startTheKernel();
-        System.out.println("OS.Exit: startTheKernel returned");
     }
 
     // Sleep: Pauses process execution for the specified number of milliseconds.
@@ -155,11 +151,6 @@ public class OS {
         parameters.add(s);
         currentCall = CallType.Open;
         startTheKernel();
-        while (retVal == null) {
-            try {
-                Thread.sleep(10);
-            } catch (InterruptedException e) {}
-        }
         return (int) retVal;
     }
 
@@ -183,11 +174,6 @@ public class OS {
         parameters.add(size);
         currentCall = CallType.Read;
         startTheKernel();
-        while (retVal == null) {
-            try {
-                Thread.sleep(10);
-            } catch (InterruptedException _) {}
-        }
         return (byte[]) retVal;
     }
 
@@ -210,16 +196,10 @@ public class OS {
         parameters.add(data);
         currentCall = CallType.Write;
         startTheKernel();
-        while (retVal == null) {
-            try {
-                Thread.sleep(10);
-            } catch (InterruptedException e) {}
-        }
         return (int) retVal;
     }
 
     // ***** Message Calls (Stubs) *****
-    // Placeholders for message-passing functionality which may be implemented in future assignments.
 
     // SendMessage: Stub for sending a kernel message.
     public static void SendMessage(KernelMessage km) {
@@ -233,7 +213,7 @@ public class OS {
     }
 
     // GetPidByName: Stub for a method that would return a PID given a process name.
-    // Currently returns 0 as implementation is pending.
+    // Currently, returns 0 as implementation is pending.
     public static int GetPidByName(String name) {
         return 0; // implementation pending
     }
