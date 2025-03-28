@@ -201,21 +201,34 @@ public class OS {
 
     // ***** Message Calls (Stubs) *****
 
-    // SendMessage: Stub for sending a kernel message.
-    public static void SendMessage(KernelMessage km) {
-        // implementation pending
+    // Sends a kernel message by forwarding the message to the kernel
+    public static void SendMessage(KernelMessage km) throws InterruptedException {
+        parameters.clear();
+        parameters.add(km);
+        currentCall = CallType.SendMessage;
+        startTheKernel();
+        retVal = null;
     }
 
-    // WaitForMessage: Stub for receiving a kernel message.
-    // Returns a KernelMessage object, or null if not implemented.
-    public static KernelMessage WaitForMessage() {
-        return null;
+    // Waits for a kernel message to arrive and returns it
+    public static KernelMessage WaitForMessage() throws InterruptedException {
+        parameters.clear();
+        currentCall = CallType.WaitForMessage;
+        startTheKernel();
+        KernelMessage km = (KernelMessage) retVal;
+        retVal = null;
+        return km;
     }
 
-    // GetPidByName: Stub for a method that would return a PID given a process name.
-    // Currently, returns 0 as implementation is pending.
-    public static int GetPidByName(String name) {
-        return 0; // implementation pending
+    // Returns the pid of a process given its name
+    public static int GetPidByName(String name) throws InterruptedException {
+        parameters.clear();
+        parameters.add(name);
+        currentCall = CallType.GetPIDByName;
+        startTheKernel();
+        int result = (int) retVal;
+        retVal = null;
+        return result;
     }
 
     // ***** Memory Calls (Stubs) *****

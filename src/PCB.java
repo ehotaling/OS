@@ -1,3 +1,5 @@
+import java.util.LinkedList;
+
 public class PCB { // Process Control Block
     private static int nextPid = 1;
     public final UserlandProcess userlandProcess;
@@ -6,6 +8,9 @@ public class PCB { // Process Control Block
     private int timeoutCount; // tracks consecutive timeouts
     public long wakeupTime;
     public int[] openDevices; // array to track open device VFS ids; -1 means empty
+    final String name; // process name for name based lookup
+    public LinkedList<KernelMessage> messageQueue = new LinkedList<>();
+
 
     // Only kernel should manage PCB's
     PCB(UserlandProcess up, OS.PriorityType priority) {
@@ -16,6 +21,7 @@ public class PCB { // Process Control Block
 
         pid = nextPid++; // Process gets a pid, next process gets the next pid up
         this.userlandProcess = up;
+        this.name = up.getClass().getSimpleName();
         this.priority = priority;
         this.timeoutCount = 0;
 

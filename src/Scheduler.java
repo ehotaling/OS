@@ -1,5 +1,6 @@
 import java.util.*;
 import java.time.Clock;
+import java.util.HashMap;
 
 public class Scheduler {
     // Separate queues for each priority type.
@@ -9,6 +10,9 @@ public class Scheduler {
 
     // Priority queue for sleeping processes ordered by wakeup time.
     private PriorityQueue<SleepingProcesses> sleepingProcesses;
+
+    // HashMap to map pid to PCB for fast lookup
+    private HashMap<Integer,PCB> processMap = new HashMap<>();
 
     private Clock clock = Clock.systemUTC();
     private Timer timer = new Timer();
@@ -30,7 +34,14 @@ public class Scheduler {
             case interactive -> interactiveQueue.remove(p);
             case background -> backgroundQueue.remove(p);
         }
+        // Remove process from the process map
+        processMap.remove(p.pid);
     }
+
+    public PCB getPCB(int pid) {
+        return processMap.get(pid);
+    }
+
 
     // Private class to track sleeping processes with wakeup time.
     private static class SleepingProcesses {
@@ -69,6 +80,9 @@ public class Scheduler {
         System.out.println("Scheduler.createProcess: Creating process " + up.getClass().getSimpleName() + " with priority " + p);
 
         PCB newProcess = new PCB(up, p);
+
+        // Add new process to the process map
+        processMap.put(newProcess.pid, newProcess);
 
         // If no process is currently running, start the created process otherwise it is added to the queue.
         if (runningProcess == null) {
@@ -197,6 +211,13 @@ public class Scheduler {
         sleepingProcesses.addAll(notReady);
     }
 
+    // Wakes up process that are waiting for messages
+    public void wakeUpProcess(PCB process) {
+        addProcessToQueue(process);
+        System.out.println("Scheduler: Process " + process.pid + " has been woken up from message waiting.");
+    }
+
+
 
     // Put the running process to sleep.
     public void sleep(int mills) {
@@ -205,5 +226,15 @@ public class Scheduler {
             sleepingProcesses.add(new SleepingProcesses(runningProcess, runningProcess.wakeupTime));
             runningProcess = selectProcess();
         }
+    }
+
+    // Helper method to find a process by its name
+    public int getPidByName(String name) {
+        for (PCB pcb : processMap.values()) {
+            if (pcb.name.equals(name)) {
+                return pcb.pid;
+            }
+        }
+        return -1; // if not found
     }
 }

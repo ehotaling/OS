@@ -1,13 +1,13 @@
-// Kernel.java
-// The Kernel class is a core part of our OS simulator. It extends Process and implements the Device interface,
-// handling both system calls (e.g., process creation, switching, sleep, exit) and device I/O operations.
-// This file is essential as many later assignments depend on a properly working kernel.
+import java.util.HashMap;
+
 public class Kernel extends Process implements Device {
 
     // The scheduler manages process switching and scheduling.
     private final Scheduler scheduler = new Scheduler();
     // The VFS (Virtual File System) handles device operations (e.g., file I/O) and routing of device calls.
     private final VFS vfs = new VFS();
+
+    public HashMap<Integer, PCB> waitingForMessage = new HashMap<>();
 
     // Constructor for Kernel; prints a message for debugging purposes.
     public Kernel() {
@@ -63,13 +63,13 @@ public class Kernel extends Process implements Device {
                     case Close -> {
                         System.out.println("Kernel.main: System call is Close");
                         // Close a device and free its slot in the current process.
-                        close((int) OS.parameters.get(0));
+                        close((int) OS.parameters.getFirst());
                         OS.retVal = 1;
                     }
                     case Read -> {
                         System.out.println("Kernel.main: System call is Read");
                         // Read data from a device via the VFS.
-                        OS.retVal = read((int) OS.parameters.get(0), (int) OS.parameters.get(1));
+                        OS.retVal = read((int) OS.parameters.getFirst(), (int) OS.parameters.get(1));
                     }
                     case Seek -> {
                         System.out.println("Kernel.main: System call is Seek");
@@ -126,6 +126,7 @@ public class Kernel extends Process implements Device {
         if (scheduler.runningProcess != null) {
             PCB exitingProcess = scheduler.runningProcess;
             exitingProcess.exit(); // Mark as exited.
+            exitingProcess.messageQueue.clear();
             scheduler.removeProcess(exitingProcess);
             scheduler.switchProcess();
         }
@@ -201,19 +202,60 @@ public class Kernel extends Process implements Device {
         return vfs.write(vfsId, data);
     }
 
-    // Stub implementations for additional system calls (pending implementation):
+    // Copies the provided KernelMessage, sets the sender Pid, and delivers it to the target process
+    private void SendMessage(KernelMessage km) {
+        // Set sender pid
+        int senderPid = GetPid();
+        km.setSenderPid(senderPid);
 
-    // SendMessage: Placeholder for sending a kernel message.
-    private void SendMessage() { /* pending */ }
+        // Create copy of message so recipient gets its own instance (shared memory would allow overwriting)
+        KernelMessage messageCopy = new KernelMessage(km);
 
-    // WaitForMessage: Placeholder for waiting for a kernel message.
-    private KernelMessage WaitForMessage() {
-        return null;
+        // Get target pid from the message and locate receiver pcb
+        int targetPid = messageCopy.getReceiverPid();
+        PCB receiver = scheduler.getPCB(targetPid);
+
+        if (receiver == null) {
+            System.out.println("SendMessage: Recipient with pid " + targetPid + " not found.");
+            return;
+        }
+
+        // Add message copy to receivers message queue
+        receiver.messageQueue.add(messageCopy);
+        System.out.println("SendMessage: Message sent from pid " + senderPid + " to pid " + targetPid);
+
+        // If receiver is waiting for a message, remove it from the waiting map and requeue into runnable queue
+        if (waitingForMessage.containsKey(targetPid)) {
+            PCB waitingProcess = waitingForMessage.remove(targetPid);
+            scheduler.wakeUpProcess(waitingProcess); // re-add process to running queue
+            System.out.println("SendMessage: Woke up process with pid " + targetPid);
+        }
+
     }
 
-    // GetPidByName: Placeholder for retrieving a PID by process name.
+    // Checks the running process's running message queue and if it's empty it's marked as waiting and the
+    // scheduler is invoked to switch process
+    private KernelMessage WaitForMessage() {
+        PCB current = scheduler.runningProcess;
+        if (current == null) return null;
+
+        // Loop until a message is available.
+        while (current.messageQueue.isEmpty()) {
+            // Add current process to the waiting map if its not already waiting
+            if (!waitingForMessage.containsKey(current.pid)) {
+                waitingForMessage.put(current.pid, current);
+                System.out.println("WaitForMessage: Process " + current.pid + " is now waiting for a message.");
+            }
+            // Switch to another process and when the process wakes up it resumes here
+            scheduler.switchProcess();
+            // When process wakes up it will check if message has arrived
+        }
+        return current.messageQueue.removeFirst();
+    }
+
+    // Helper method to find a process by its name
     private int GetPidByName(String name) {
-        return 0;
+        return scheduler.getPidByName(name);
     }
 
     // GetMapping: Placeholder for obtaining memory mapping.

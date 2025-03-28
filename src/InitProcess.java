@@ -1,40 +1,20 @@
-// This is the class that manages what happens on startup
 public class InitProcess extends UserlandProcess {
-    public InitProcess() {
-    }
-
     @Override
     public void main() throws InterruptedException {
-        System.out.println("InitProcess.main: Init process started.");
+        System.out.println("InitProcess.main: Starting message passing test.");
 
-        System.out.println("InitProcess.main: Creating HelloWorld.");
-        OS.CreateProcess(new HelloWorld(), OS.PriorityType.realtime);
-        System.out.println("InitProcess.main: HelloWorld created.");
+        // Create the Ping process.
+        System.out.println("InitProcess.main: Creating Ping process.");
+        OS.CreateProcess(new Ping(), OS.PriorityType.realtime);
         cooperate();
 
-        System.out.println("InitProcess.main: Creating GoodByeWorld.");
-        OS.CreateProcess(new GoodbyeWorld(), OS.PriorityType.realtime);
-        System.out.println("InitProcess.main: GoodByeWorld created.");
+        // Create the Pong process.
+        System.out.println("InitProcess.main: Creating Pong process.");
+        OS.CreateProcess(new Pong(), OS.PriorityType.realtime);
         cooperate();
 
-        System.out.println("InitProcess.main: Creating testDemotion.");
-        OS.CreateProcess(new testDemotion(), OS.PriorityType.realtime);
-        System.out.println("InitProcess.main: testDemotion created.");
-        cooperate();
-
-        System.out.println("InitProcess.main: Creating SleepTestProcess.");
-        OS.CreateProcess(new SleepTestProcess(), OS.PriorityType.realtime);
-        System.out.println("InitProcess.main: SleepTestProcess created.");
-        cooperate();
-
-        System.out.println("InitProcess.main: Creating IdleProcess...");
-        OS.CreateProcess(new IdleProcess(), OS.PriorityType.background);
-        System.out.println("InitProcess.main: IdleProcess created.");
-        cooperate();
-
-        System.out.println("InitProcess.main: Exiting.");
+        System.out.println("InitProcess.main: Message passing test setup complete. Exiting InitProcess.");
         OS.Exit();
-        return;
     }
-
 }
+
