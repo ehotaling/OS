@@ -4,6 +4,7 @@ public class PCB { // Process Control Block
     private static int nextPid = 1;
     public final UserlandProcess userlandProcess;
     public int pid;
+    public boolean waitingForMessage; // flag to track if process is waiting on a message
     private OS.PriorityType priority;
     private int timeoutCount; // tracks consecutive timeouts
     public long wakeupTime;
@@ -24,6 +25,7 @@ public class PCB { // Process Control Block
         this.name = up.getClass().getSimpleName();
         this.priority = priority;
         this.timeoutCount = 0;
+        this.waitingForMessage = false;
 
         // allocate openDevices array with 10 slots and initialize each slot to -1
         openDevices = new int[10];
@@ -66,6 +68,7 @@ public class PCB { // Process Control Block
     }
 
     public void stop() throws InterruptedException {
+        System.out.println("PCB: Calling Process.stop()");
         userlandProcess.stop();
     }
 
