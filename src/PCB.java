@@ -68,7 +68,6 @@ public class PCB { // Process Control Block
     }
 
     public void stop() throws InterruptedException {
-        System.out.println("PCB: Calling Process.stop()");
         userlandProcess.stop();
     }
 
@@ -93,7 +92,7 @@ public class PCB { // Process Control Block
             case interactive -> priority = OS.PriorityType.background;
         }
         resetTimeoutCount();
-        System.out.println("Scheduler.demote: Process " + pid
+        System.out.println("PCB.demotePriority: Process " + this.userlandProcess.getClass().getSimpleName()
                 + " demoted from " + oldPriority + " to " + priority);
     }
 

@@ -1,3 +1,5 @@
+import jdk.swing.interop.SwingInterOpUtils;
+
 import java.util.concurrent.Semaphore;
 
 public abstract class Process implements Runnable {
@@ -34,7 +36,6 @@ public abstract class Process implements Runnable {
     // Called when the scheduler’s timer interrupts.
     // Sets the flag indicating that the process’s quantum has expired.
     public void requestStop() {
-        System.out.println("Process.requestStop: Request stop for process: " + this.getClass().getSimpleName());
         isExpired = true;
     }
 
@@ -62,16 +63,18 @@ public abstract class Process implements Runnable {
         available.release();
     }
 
+
     // Stops (pauses) the process by acquiring a permit from the semaphore.
     // This effectively blocks the process until the semaphore is released again by the scheduler.
     public void stop() {
         try {
+            System.out.println("Process.stop: " + this.getClass().getSimpleName() + ": stopping process: " + this.getClass().getSimpleName());
             available.acquire();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
-        System.out.println("Process.stop: Process stopped: " + this.getClass().getSimpleName() +
-                ", now has permits: " + available.availablePermits());
+//        System.out.println("Process.stop: Process stopped: " + this.getClass().getSimpleName() +
+//                ", now has permits: " + available.availablePermits());
     }
 
     // The run() method is invoked when the process's thread starts.
@@ -106,8 +109,6 @@ public abstract class Process implements Runnable {
                     + " is expired, switching process.");
             isExpired = false;
             OS.switchProcess();
-        } else {
-            System.out.println("Process.cooperate: Process " + this.getClass().getSimpleName() + " not expired.");
         }
     }
 

@@ -8,6 +8,7 @@ public class Pong extends UserlandProcess {
 
             while (true) {
                 // Wait for a message from Ping.
+                System.out.println("PONG: Waiting for message...");
                 KernelMessage incoming = OS.WaitForMessage();
                 System.out.println("PONG: Received -> " + incoming);
 
@@ -15,6 +16,7 @@ public class Pong extends UserlandProcess {
                 int responseType = incoming.getMessageType() + 1;
                 String data = "Pong response " + responseType;
                 KernelMessage reply = new KernelMessage(myPid, pingPid, responseType, data.getBytes());
+                System.out.println("PONG: Sending reply -> " + reply);
                 OS.SendMessage(reply);
                 System.out.println("PONG: Sent -> " + reply);
             }

@@ -82,13 +82,23 @@ public class Kernel extends Process implements Device {
                         // Write data to a device and return the number of bytes written.
                         OS.retVal = write((int) OS.parameters.get(0), (byte[]) OS.parameters.get(1));
                     }
-                    default -> {
-                        // Handle any unrecognized system call.
-                        System.out.println("Kernel.main: Unhandled system call: " + OS.currentCall);
+
+                    case SendMessage -> {
+                        System.out.println("Kernel.main: System call is SendMessage");
+                        // OS.parameters.get(0) is expected to be a KernelMessage.
+                        SendMessage((KernelMessage) OS.parameters.get(0));
+                        OS.retVal = 1;
+                    }
+                    case WaitForMessage -> {
+                        System.out.println("Kernel.main: System call is WaitForMessage");
+                        OS.retVal = WaitForMessage();
+                    }
+                    case GetPIDByName -> {
+                        System.out.println("Kernel.main: System call is GetPIDByName");
+                        // OS.parameters.get(0) is expected to be a String with the process name.
+                        OS.retVal = GetPidByName((String) OS.parameters.get(0));
                     }
                 }
-            }
-            if (OS.currentCall != null) {
             }
             // Reset the current system call and clear the parameters for the next call.
             OS.currentCall = null;
@@ -97,7 +107,7 @@ public class Kernel extends Process implements Device {
             // If a process is scheduled to run, start it.
             if (scheduler.getCurrentlyRunning() != null) {
                 System.out.println("Kernel: Starting " + scheduler.getCurrentlyRunning().userlandProcess.getClass().getSimpleName());
-                scheduler.getCurrentlyRunning().start();
+                scheduler.getCurrentlyRunning().userlandProcess.start();
             }
             this.stop();
         }
@@ -222,7 +232,7 @@ public class Kernel extends Process implements Device {
 
         // Add message copy to receivers message queue
         receiver.messageQueue.add(messageCopy);
-        System.out.println("SendMessage: Message sent from pid " + senderPid + " to pid " + targetPid);
+        System.out.println("Kernel.SendMessage: Message sent from pid " + senderPid + " to pid " + targetPid);
 
         // If receiver is waiting for a message, remove it from the waiting map and requeue into runnable queue
         if (waitingForMessage.containsKey(targetPid)) {
@@ -235,21 +245,26 @@ public class Kernel extends Process implements Device {
 
     // Checks the running process's running message queue and if it's empty it's marked as waiting and the
     // scheduler is invoked to switch process
-    private KernelMessage WaitForMessage() {
+    private Object WaitForMessage() throws InterruptedException {
+        System.out.println("Kernel.WaitForMessage Entered");
         PCB current = scheduler.runningProcess;
         if (current == null) return null;
 
-        // Loop until a message is available.
+        // If there is no message then put process into waiting map and switch process. When a message is sent, process
+        // will be awoken.
         while (current.messageQueue.isEmpty()) {
-            // Add current process to the waiting map if its not already waiting
+            // Add current process to the waiting map if it's not already waiting
             if (!waitingForMessage.containsKey(current.pid)) {
                 waitingForMessage.put(current.pid, current);
-                System.out.println("WaitForMessage: Process " + current.pid + " is now waiting for a message.");
+                current.waitingForMessage = true;
+                System.out.println("Kernel.WaitForMessage: Process " + current.userlandProcess.getClass().getSimpleName() + " is now waiting for a message.");
+                scheduler.switchAndStartProcess();
             }
-            // Switch to another process and when the process wakes up it resumes here
-            scheduler.switchProcess();
-            // When process wakes up it will check if message has arrived
         }
+        // When there is a message return it
+        System.out.println("Kernel.WaitForMessage: Process " + current.userlandProcess.getClass().getSimpleName() + " is returning a message.");
+        waitingForMessage.remove(current.pid);
+        current.waitingForMessage = false;
         return current.messageQueue.removeFirst();
     }
 

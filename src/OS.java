@@ -51,13 +51,17 @@ public class OS {
         // Yield control to the kernel:
         // If the scheduler has a currently running process, stop that process.
         if (ki.getScheduler() != null && ki.getScheduler().getCurrentlyRunning() != null) {
-            System.out.println("OS.startTheKernel: Stopping " + ki.getScheduler().getCurrentlyRunning().userlandProcess.getClass().getSimpleName() + " for a system call.");
+            System.out.println("OS.startTheKernel: Stopping " + ki.getScheduler().getCurrentlyRunning().userlandProcess.getClass().getSimpleName() + " for a system call: " + OS.currentCall);
             ki.getScheduler().getCurrentlyRunning().stop();
         }
+        waitForRetVal();
+    }
+
+    private static void waitForRetVal() {
         // wait until the kernel completes its task and sets retVal.
         while (retVal == null) {
             try {
-                Thread.sleep(10);
+                Thread.sleep(1);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }
@@ -75,9 +79,9 @@ public class OS {
         System.out.println("OS.Startup: Kernel initialized");
         System.out.println("OS.Startup: Creating IdleProcess.");
         CreateProcess(new IdleProcess(), PriorityType.background);
-        System.out.println("OS.Startup: Creating TestInitProcess");
+        System.out.println("OS.Startup: Creating InitProcess");
         CreateProcess(init, PriorityType.interactive);
-        System.out.println("OS.Startup: TestInitProcess created.");
+        System.out.println("OS.Startup: InitProcess created.");
     }
 
     // CreateProcess without explicit priority; defaults to an interactive process.
@@ -97,9 +101,9 @@ public class OS {
         parameters.add(priority);
         currentCall = CallType.CreateProcess;
         startTheKernel();
-        int result = (int) retVal;
-        retVal = null;  // Reset shared return value for subsequent calls.
-        return result;
+        int pid = (int) retVal;
+        retVal = null;
+        return pid;
     }
 
     // switchProcess: Requests a process switch.
@@ -117,7 +121,9 @@ public class OS {
         parameters.clear();
         currentCall = CallType.GetPID;
         startTheKernel();
-        return (int) retVal;
+        int pid = (int) retVal;
+        retVal = null;
+        return pid;
     }
 
     // Exit: Processes the exit system call.
@@ -151,7 +157,9 @@ public class OS {
         parameters.add(s);
         currentCall = CallType.Open;
         startTheKernel();
-        return (int) retVal;
+        int deviceId = (int) retVal;
+        retVal = null;
+        return deviceId;
     }
 
     // Close: Performs a device close system call.
@@ -174,7 +182,9 @@ public class OS {
         parameters.add(size);
         currentCall = CallType.Read;
         startTheKernel();
-        return (byte[]) retVal;
+        byte[] dataRead = (byte[]) retVal;
+        retVal = null;
+        return dataRead;
     }
 
     // Seek: Performs a device seek system call.
@@ -196,7 +206,9 @@ public class OS {
         parameters.add(data);
         currentCall = CallType.Write;
         startTheKernel();
-        return (int) retVal;
+        int bytesWritten = (int) retVal;
+        retVal = null;
+        return bytesWritten;
     }
 
     // ***** Message Calls (Stubs) *****
@@ -206,6 +218,7 @@ public class OS {
         parameters.clear();
         parameters.add(km);
         currentCall = CallType.SendMessage;
+        System.out.println("OS.SendMessage: " + km);
         startTheKernel();
         retVal = null;
     }
@@ -226,9 +239,9 @@ public class OS {
         parameters.add(name);
         currentCall = CallType.GetPIDByName;
         startTheKernel();
-        int result = (int) retVal;
+        int pid = (int) retVal;
         retVal = null;
-        return result;
+        return pid;
     }
 
     // ***** Memory Calls (Stubs) *****

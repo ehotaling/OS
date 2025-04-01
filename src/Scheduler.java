@@ -34,12 +34,19 @@ public class Scheduler {
             case interactive -> interactiveQueue.remove(p);
             case background -> backgroundQueue.remove(p);
         }
-        // Remove process from the process map
-        processMap.remove(p.pid);
-    }
+        // Remove process from the process map if not waiting on a message
+        if (!p.waitingForMessage) {
+            processMap.remove(p.pid);
+        }
 
+    }
     public PCB getPCB(int pid) {
         return processMap.get(pid);
+    }
+
+    public void switchAndStartProcess() {
+        switchProcess();
+        runningProcess.userlandProcess.start();
     }
 
 
@@ -97,8 +104,8 @@ public class Scheduler {
 
     public void switchProcess() {
 
-        // If there is a currently running process, check if it should be requeued.
-        if (runningProcess != null && !runningProcess.isDone()) {
+        // If there is a currently running process, check if it should be re-queued.
+        if (runningProcess != null && !runningProcess.isDone() && !runningProcess.waitingForMessage) {
             if (!runningProcess.userlandProcess.isDone()) {
                 addProcessToQueue(runningProcess);
             }
