@@ -1,7 +1,7 @@
 import java.util.*;
 import java.time.Clock;
 import java.util.HashMap;
-
+// TODO Add support to remove and return message from the message queuedeal wiht the boolean waiting for message
 public class Scheduler {
     // Separate queues for each priority type.
     private LinkedList<PCB> realTimeQueue = new LinkedList<>();

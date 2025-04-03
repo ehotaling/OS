@@ -91,7 +91,9 @@ public class Kernel extends Process implements Device {
                     }
                     case WaitForMessage -> {
                         System.out.println("Kernel.main: System call is WaitForMessage");
-                        OS.retVal = WaitForMessage();
+                        var retVal = WaitForMessage();
+                        if (retVal != null)
+                            OS.retVal = retVal;
                     }
                     case GetPIDByName -> {
                         System.out.println("Kernel.main: System call is GetPIDByName");
@@ -252,20 +254,21 @@ public class Kernel extends Process implements Device {
 
         // If there is no message then put process into waiting map and switch process. When a message is sent, process
         // will be awoken.
-        while (current.messageQueue.isEmpty()) {
+        if (current.messageQueue.isEmpty()) {
             // Add current process to the waiting map if it's not already waiting
-            if (!waitingForMessage.containsKey(current.pid)) {
-                waitingForMessage.put(current.pid, current);
-                current.waitingForMessage = true;
-                System.out.println("Kernel.WaitForMessage: Process " + current.userlandProcess.getClass().getSimpleName() + " is now waiting for a message.");
-                scheduler.switchAndStartProcess();
-            }
+            waitingForMessage.put(current.pid, current);
+            current.waitingForMessage = true;
+            System.out.println("Kernel.WaitForMessage: Process " + current.userlandProcess.getClass().getSimpleName() + " is now waiting for a message.");
+            scheduler.switchProcess();
+            return null;
+
         }
-        // When there is a message return it
-        System.out.println("Kernel.WaitForMessage: Process " + current.userlandProcess.getClass().getSimpleName() + " is returning a message.");
-        waitingForMessage.remove(current.pid);
-        current.waitingForMessage = false;
-        return current.messageQueue.removeFirst();
+        else {
+            // When there is a message return it
+            System.out.println("Kernel.WaitForMessage: Process " + current.userlandProcess.getClass().getSimpleName() + " is returning a message.");
+            current.waitingForMessage = false;
+            return current.messageQueue.removeFirst();
+        }
     }
 
     // Helper method to find a process by its name
