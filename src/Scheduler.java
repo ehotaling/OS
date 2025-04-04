@@ -1,7 +1,7 @@
 import java.util.*;
 import java.time.Clock;
 import java.util.HashMap;
-// TODO Add support to remove and return message from the message queuedeal wiht the boolean waiting for message
+
 public class Scheduler {
     // Separate queues for each priority type.
     private LinkedList<PCB> realTimeQueue = new LinkedList<>();
@@ -113,6 +113,13 @@ public class Scheduler {
 
         // Select the next process to run.
         runningProcess = selectProcess();
+
+        // If the process was waiting for a message reset the flag and return the Kernel Message to the process.
+        if (runningProcess.waitingForMessage) {
+            runningProcess.waitingForMessage = false;
+            OS.retVal = runningProcess.messageQueue.removeFirst();
+        }
+
         if (runningProcess == null) {
             // Fallback: attempt to poll any process from the background queue.
             System.out.println("Scheduler.switchProcess: No process selected by selectProcess(), attempting fallback.");

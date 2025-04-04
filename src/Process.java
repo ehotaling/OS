@@ -58,9 +58,12 @@ public abstract class Process implements Runnable {
     public void start() {
         System.out.println("Process.start: Starting process: " + this.getClass().getSimpleName());
         if (!thread.isAlive()) {
+            System.out.println("Process.start: Starting thread: " + this.getClass().getSimpleName());
             thread.start();
         }
+        System.out.println("Process.start: Semaphore available before calling available.release(): " + available.availablePermits());
         available.release();
+        System.out.println("Process.start: Semaphore available after calling available.release(): " + available.availablePermits());
     }
 
 

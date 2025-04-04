@@ -115,6 +115,71 @@ public class Kernel extends Process implements Device {
         }
     }
 
+    // Messages
+
+    // Copies the provided KernelMessage, sets the sender Pid, and delivers it to the target process
+    private void SendMessage(KernelMessage km) {
+        // Set sender pid
+        int senderPid = GetPid();
+        km.setSenderPid(senderPid);
+
+        // Create copy of message so recipient gets its own instance (shared memory would allow overwriting)
+        KernelMessage messageCopy = new KernelMessage(km);
+
+        // Get target pid from the message and locate receiver pcb
+        int targetPid = messageCopy.getReceiverPid();
+        PCB receiver = scheduler.getPCB(targetPid);
+
+        if (receiver == null) {
+            System.out.println("SendMessage: Recipient with pid " + targetPid + " not found.");
+            return;
+        }
+
+        // Add message copy to receivers message queue
+        receiver.messageQueue.add(messageCopy);
+        System.out.println("Kernel.SendMessage: Message sent from pid " + senderPid + " to pid " + targetPid);
+
+        // If receiver is waiting for a message, remove it from the waiting map and requeue into runnable queue
+        if (waitingForMessage.containsKey(targetPid)) {
+            PCB waitingProcess = waitingForMessage.remove(targetPid);
+            scheduler.wakeUpProcess(waitingProcess); // re-add process to running queue
+            System.out.println("SendMessage: Woke up process with pid " + targetPid);
+        }
+
+    }
+
+    // Checks the running process's running message queue and if it's empty it's marked as waiting and the
+    // scheduler is invoked to switch process
+    private Object WaitForMessage() throws InterruptedException {
+        System.out.println("Kernel.WaitForMessage Entered");
+        PCB current = scheduler.runningProcess;
+        if (current == null) throw new InterruptedException();
+
+        // If there is no message then put process into waiting map and switch process. When a message is sent, process
+        // will be awoken.
+        if (current.messageQueue.isEmpty()) {
+            // Add current process to the waiting map if it's not already waiting
+            waitingForMessage.put(current.pid, current);
+            current.waitingForMessage = true;
+            System.out.println("Kernel.WaitForMessage: Process " + current.userlandProcess.getClass().getSimpleName() + " is now waiting for a message.");
+            scheduler.switchProcess();
+            return null;
+
+        } else {
+            // If there is a message return it
+            System.out.println("Kernel.WaitForMessage: Process " + current.userlandProcess.getClass().getSimpleName() + " is returning a message.");
+            current.waitingForMessage = false;
+            return current.messageQueue.removeFirst();
+        }
+    }
+
+    // Helper method to find a process by its name
+    private int GetPidByName(String name) {
+        return scheduler.getPidByName(name);
+    }
+
+
+
     // Scheduler-related helper methods:
 
     // SwitchProcess: Delegates process switching to the scheduler.
@@ -214,67 +279,7 @@ public class Kernel extends Process implements Device {
         return vfs.write(vfsId, data);
     }
 
-    // Copies the provided KernelMessage, sets the sender Pid, and delivers it to the target process
-    private void SendMessage(KernelMessage km) {
-        // Set sender pid
-        int senderPid = GetPid();
-        km.setSenderPid(senderPid);
 
-        // Create copy of message so recipient gets its own instance (shared memory would allow overwriting)
-        KernelMessage messageCopy = new KernelMessage(km);
-
-        // Get target pid from the message and locate receiver pcb
-        int targetPid = messageCopy.getReceiverPid();
-        PCB receiver = scheduler.getPCB(targetPid);
-
-        if (receiver == null) {
-            System.out.println("SendMessage: Recipient with pid " + targetPid + " not found.");
-            return;
-        }
-
-        // Add message copy to receivers message queue
-        receiver.messageQueue.add(messageCopy);
-        System.out.println("Kernel.SendMessage: Message sent from pid " + senderPid + " to pid " + targetPid);
-
-        // If receiver is waiting for a message, remove it from the waiting map and requeue into runnable queue
-        if (waitingForMessage.containsKey(targetPid)) {
-            PCB waitingProcess = waitingForMessage.remove(targetPid);
-            scheduler.wakeUpProcess(waitingProcess); // re-add process to running queue
-            System.out.println("SendMessage: Woke up process with pid " + targetPid);
-        }
-
-    }
-
-    // Checks the running process's running message queue and if it's empty it's marked as waiting and the
-    // scheduler is invoked to switch process
-    private Object WaitForMessage() throws InterruptedException {
-        System.out.println("Kernel.WaitForMessage Entered");
-        PCB current = scheduler.runningProcess;
-        if (current == null) return null;
-
-        // If there is no message then put process into waiting map and switch process. When a message is sent, process
-        // will be awoken.
-        if (current.messageQueue.isEmpty()) {
-            // Add current process to the waiting map if it's not already waiting
-            waitingForMessage.put(current.pid, current);
-            current.waitingForMessage = true;
-            System.out.println("Kernel.WaitForMessage: Process " + current.userlandProcess.getClass().getSimpleName() + " is now waiting for a message.");
-            scheduler.switchProcess();
-            return null;
-
-        }
-        else {
-            // When there is a message return it
-            System.out.println("Kernel.WaitForMessage: Process " + current.userlandProcess.getClass().getSimpleName() + " is returning a message.");
-            current.waitingForMessage = false;
-            return current.messageQueue.removeFirst();
-        }
-    }
-
-    // Helper method to find a process by its name
-    private int GetPidByName(String name) {
-        return scheduler.getPidByName(name);
-    }
 
     // GetMapping: Placeholder for obtaining memory mapping.
     private void GetMapping(int virtualPage) {

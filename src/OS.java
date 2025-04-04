@@ -211,7 +211,7 @@ public class OS {
         return bytesWritten;
     }
 
-    // ***** Message Calls (Stubs) *****
+    // ***** Message Calls  *****
 
     // Sends a kernel message by forwarding the message to the kernel
     public static void SendMessage(KernelMessage km) throws InterruptedException {
