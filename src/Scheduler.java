@@ -156,32 +156,54 @@ public class Scheduler {
 
     // Select next process using a probabilistic model.
     private PCB selectProcess() {
-        wakeupProcesses(); // Wakeup sleeping processes
+        wakeupProcesses(); // wake any sleeping processes first
         Random random = new Random();
         double randomDouble = random.nextDouble();
 
-        if (!realTimeQueue.isEmpty()) {
-            if (randomDouble < 0.6) return pollNext(realTimeQueue); // 60% chance for real-time.
-            if (!interactiveQueue.isEmpty() && randomDouble < 0.9) return pollNext(interactiveQueue); // 30% for interactive.
-            return pollNextBackground(); // 10% for background.
-        }
-
-        if (!interactiveQueue.isEmpty()) {
-            if (randomDouble < 0.75) {
-                return pollNext(interactiveQueue); // Prefer interactive.
-            } else {
-                PCB process = pollNextBackground();
-                // Fallback to interactive if no background process is available.
-                return process != null ? process : pollNext(interactiveQueue);
+        // If there is at least one non-idle process available...
+        if (!realTimeQueue.isEmpty() || !interactiveQueue.isEmpty() || hasNonIdleBackground()) {
+            // Prefer real-time processes (60% chance)
+            if (!realTimeQueue.isEmpty() && randomDouble < 0.6) {
+                return pollNext(realTimeQueue);
+            }
+            // Otherwise, try interactive processes (next 30%)
+            else if (!interactiveQueue.isEmpty() && randomDouble < 0.9) {
+                return pollNext(interactiveQueue);
+            }
+            // Otherwise, check background—but only non-idle processes!
+            else {
+                PCB pcb = pollNonIdleBackground();
+                if (pcb != null) {
+                    return pcb;
+                }
+                // Fallback: if background had no non-idle, try real-time or interactive if available.
+                if (!realTimeQueue.isEmpty()) {
+                    return pollNext(realTimeQueue);
+                }
+                if (!interactiveQueue.isEmpty()) {
+                    return pollNext(interactiveQueue);
+                }
             }
         }
-
-        // Only background processes left.
-        return pollNextBackground();
+        // No non-idle process exists in any queue, so allow IdleProcess.
+        if (!realTimeQueue.isEmpty()) return pollNext(realTimeQueue);
+        if (!interactiveQueue.isEmpty()) return pollNext(interactiveQueue);
+        if (!backgroundQueue.isEmpty()) return pollNext(backgroundQueue);
+        return null;
     }
 
-    // Poll next background process, avoiding IdleProcess if possible.
-    private PCB pollNextBackground() {
+    // Helper method: checks if backgroundQueue has any non-idle processes.
+    private boolean hasNonIdleBackground() {
+        for (PCB pcb : backgroundQueue) {
+            if (!(pcb.userlandProcess instanceof IdleProcess) && !pcb.isDone()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // Helper method: polls the first non-idle process from the background queue.
+    private PCB pollNonIdleBackground() {
         for (Iterator<PCB> it = backgroundQueue.iterator(); it.hasNext(); ) {
             PCB pcb = it.next();
             if (!(pcb.userlandProcess instanceof IdleProcess) && !pcb.isDone()) {
@@ -189,7 +211,7 @@ public class Scheduler {
                 return pcb;
             }
         }
-        return pollNext(backgroundQueue);
+        return null;
     }
 
     // Poll a queue until a process that is not done is found.
