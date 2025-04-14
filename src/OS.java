@@ -11,6 +11,7 @@
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 public class OS {
 
@@ -24,9 +25,6 @@ public class OS {
 
     // Shared return value for system calls. Kernel writes to this and userland waits for it.
     public static Object retVal;
-
-    public static void getMapping(int virtualPageNum) {
-    }
 
     // Enum defining the types of system calls. Includes process management calls and device I/O operations.
     public enum CallType {
@@ -247,12 +245,39 @@ public class OS {
         return pid;
     }
 
-    // ***** Memory Calls (Stubs) *****
-    // Placeholders for future memory management features such as mapping, allocation, and freeing of memory.
+    // ***** Memory Calls *****
 
-    // GetMapping: Stub for obtaining the mapping for a virtual page.
-    public static void GetMapping(int virtualPage) {
-        // implementation pending
+    // Obtain the mapping for a virtual page.
+    public static void GetMapping(int virtualPageNum) throws InterruptedException {
+        // Look up the value inside the currently running processes page table and return it
+        PCB currentProcess = ki.getScheduler().getCurrentlyRunning();
+
+        // Get current process page table
+        int[] pageTable = currentProcess.pageTable;
+
+        // Check bounds for virtualPageNum
+        if (virtualPageNum < 0 || virtualPageNum >= pageTable.length) {
+            System.out.println("OS.GetMapping: Seg fault. Invalid page number: " + virtualPageNum);
+            Exit();
+            return;
+        }
+
+        int physicalPageNum = pageTable[virtualPageNum];
+
+        // if there is no mapping, that's a seg fault
+        if (physicalPageNum == -1) {
+            System.out.println("OS.GetMapping: Seg fault: Unmapped page " + virtualPageNum);
+            Exit();
+            return;
+        }
+
+        // Otherwise, update random TLB entry
+        int randomIndex = (int) (Math.random() * 2); // for 0 or 1
+        Hardware.TLB[randomIndex][0] = virtualPageNum;
+        Hardware.TLB[randomIndex][1] = physicalPageNum;
+
+        System.out.println("OS.GetMapping: Mapped virtual page " + virtualPageNum + " to physical page " +
+                physicalPageNum + " in TLB[" + randomIndex + "]");
     }
 
     // AllocateMemory: Stub for memory allocation.
