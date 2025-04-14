@@ -25,6 +25,9 @@ public class OS {
     // Shared return value for system calls. Kernel writes to this and userland waits for it.
     public static Object retVal;
 
+    public static void getMapping(int virtualPageNum) {
+    }
+
     // Enum defining the types of system calls. Includes process management calls and device I/O operations.
     public enum CallType {
         SwitchProcess, SendMessage, Open, Close, Read, Seek, Write,
