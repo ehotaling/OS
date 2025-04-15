@@ -11,7 +11,7 @@ public class PCB { // Process Control Block
     public int[] openDevices; // array to track open device VFS ids; -1 means empty
     final String name; // process name for name based lookup
     public LinkedList<KernelMessage> messageQueue = new LinkedList<>();
-    public int[] pageTable;
+    public int[] pageTable = new int[100];
 
     // Only kernel should manage PCB's
     PCB(UserlandProcess up, OS.PriorityType priority) {
@@ -28,7 +28,6 @@ public class PCB { // Process Control Block
         this.waitingForMessage = false;
 
         // Initialize page table for PCB
-        pageTable = new int[100];
         for (int i = 0; i < 100; i++) {
             pageTable[i] = -1;
         }

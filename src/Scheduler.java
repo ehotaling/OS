@@ -111,6 +111,14 @@ public class Scheduler {
             }
         }
 
+        // Clear TLB on Task Switch
+        System.out.println("Scheduler.switchProcess: Clearing TLB.");
+        for (int i = 0; i < Hardware.TLB.length; i++) {
+            Hardware.TLB[i][0] = -1; // Invalidate virtual page number mapping
+            Hardware.TLB[i][1] = -1; // Optionally clear physical page too
+        }
+
+
         // Select the next process to run.
         runningProcess = selectProcess();
 

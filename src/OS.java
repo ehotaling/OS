@@ -11,7 +11,6 @@
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
 
 public class OS {
 
@@ -249,46 +248,39 @@ public class OS {
 
     // Obtain the mapping for a virtual page.
     public static void GetMapping(int virtualPageNum) throws InterruptedException {
-        // Look up the value inside the currently running processes page table and return it
-        PCB currentProcess = ki.getScheduler().getCurrentlyRunning();
-
-        // Get current process page table
-        int[] pageTable = currentProcess.pageTable;
-
-        // Check bounds for virtualPageNum
-        if (virtualPageNum < 0 || virtualPageNum >= pageTable.length) {
-            System.out.println("OS.GetMapping: Seg fault. Invalid page number: " + virtualPageNum);
-            Exit();
-            return;
-        }
-
-        int physicalPageNum = pageTable[virtualPageNum];
-
-        // if there is no mapping, that's a seg fault
-        if (physicalPageNum == -1) {
-            System.out.println("OS.GetMapping: Seg fault: Unmapped page " + virtualPageNum);
-            Exit();
-            return;
-        }
-
-        // Otherwise, update random TLB entry
-        int randomIndex = (int) (Math.random() * 2); // for 0 or 1
-        Hardware.TLB[randomIndex][0] = virtualPageNum;
-        Hardware.TLB[randomIndex][1] = physicalPageNum;
-
-        System.out.println("OS.GetMapping: Mapped virtual page " + virtualPageNum + " to physical page " +
-                physicalPageNum + " in TLB[" + randomIndex + "]");
+        parameters.clear();
+        parameters.add(virtualPageNum);
+        currentCall = CallType.GetMapping;
+        startTheKernel();
+        retVal = null;
     }
 
-    // AllocateMemory: Stub for memory allocation.
-    // Returns an identifier for the allocated memory (currently 0 as implementation is pending).
-    public static int AllocateMemory(int size) {
-        return 0; // implementation pending
+    // Returns the start virtual address
+    public static int AllocateMemory(int size) throws InterruptedException {
+        parameters.clear();
+        parameters.add(size);
+        currentCall = CallType.AllocateMemory;
+        startTheKernel();
+        int startVirtualAddress = (int) retVal;
+        if (startVirtualAddress == -1) {
+            System.out.println("OS.AllocateMemory: Memory allocation failed");
+        }
+        retVal = null;
+        return startVirtualAddress;
     }
 
-    // FreeMemory: Stub for freeing allocated memory.
-    // Returns true if the memory was freed successfully, false otherwise.
-    public static boolean FreeMemory(int pointer, int size) {
-        return false; // implementation pending
+    // Returns true if the memory was freed successfully, false otherwise. Takes the virtual address and the amount to free
+    public static boolean FreeMemory(int pointer, int size) throws InterruptedException {
+        parameters.clear();
+        parameters.add(pointer);
+        parameters.add(size);
+        currentCall = CallType.FreeMemory;
+        startTheKernel();
+        boolean success = (boolean) retVal;
+        if (!success) {
+            System.out.println("OS.FreeMemory: Memory free failed");
+        }
+        retVal = null;
+        return success;
     }
 }
