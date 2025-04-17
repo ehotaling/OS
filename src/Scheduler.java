@@ -12,7 +12,7 @@ public class Scheduler {
     private PriorityQueue<SleepingProcesses> sleepingProcesses;
 
     // HashMap to map pid to PCB for fast lookup
-    private HashMap<Integer,PCB> processMap = new HashMap<>();
+    private HashMap<Integer, PCB> processMap = new HashMap<>();
 
     private Clock clock = Clock.systemUTC();
     private Timer timer = new Timer();
@@ -40,6 +40,7 @@ public class Scheduler {
         }
 
     }
+
     public PCB getPCB(int pid) {
         return processMap.get(pid);
     }
@@ -54,6 +55,7 @@ public class Scheduler {
     private static class SleepingProcesses {
         PCB process;
         long wakeUpTime;
+
         SleepingProcesses(PCB process, long wakeUpTime) {
             this.process = process;
             this.wakeUpTime = wakeUpTime;
@@ -114,19 +116,27 @@ public class Scheduler {
         // Clear TLB on Task Switch
         System.out.println("Scheduler.switchProcess: Clearing TLB.");
         for (int i = 0; i < Hardware.TLB.length; i++) {
-            Hardware.TLB[i][0] = -1; // Invalidate virtual page number mapping
-            Hardware.TLB[i][1] = -1; // Optionally clear physical page too
+            Hardware.TLB[i][0] = Hardware.INVALID_PAGE; // Invalidate virtual page number mapping
+            Hardware.TLB[i][1] = Hardware.INVALID_PAGE; // Optionally clear physical page too
         }
 
 
         // Select the next process to run.
         runningProcess = selectProcess();
 
-        // If the process was waiting for a message reset the flag and return the Kernel Message to the process.
-        if (runningProcess.waitingForMessage) {
-            runningProcess.waitingForMessage = false;
-            OS.retVal = runningProcess.messageQueue.removeFirst();
+        // *** ADD NULL CHECK HERE ***
+        if (runningProcess != null) {
+            if (runningProcess.waitingForMessage) {
+                runningProcess.waitingForMessage = false;
+                OS.retVal = runningProcess.messageQueue.removeFirst();
+            }
+            System.out.println("Scheduler.switchProcess: Selected " + runningProcess.userlandProcess.getClass().getSimpleName());
+        } else {
+            // Handle case where no process is ready to run
+            System.out.println("Scheduler.switchProcess: No runnable process selected!");
+            OS.retVal = null; // Ensure retVal is cleared if nothing ran
         }
+
 
         if (runningProcess == null) {
             // Fallback: attempt to poll any process from the background queue.
@@ -260,7 +270,6 @@ public class Scheduler {
         addProcessToQueue(process);
         System.out.println("Scheduler: Process " + process.pid + " has been woken up from message waiting.");
     }
-
 
 
     // Put the running process to sleep.

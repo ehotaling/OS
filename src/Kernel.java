@@ -1,4 +1,7 @@
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 
 public class Kernel extends Process implements Device {
 
@@ -15,10 +18,8 @@ public class Kernel extends Process implements Device {
     // Constructor for Kernel, initializes memory free space to false.
     public Kernel() {
         System.out.println("Kernel: Kernel constructor called");
-        // initialize freeSpace
-        for (int i = 0; i < PAGE_SIZE; i++) {
-            freeSpace[i] = true;
-        }
+        // Initialize freeSpace, true means free
+        Arrays.fill(freeSpace, true);
     }
 
     // The main method for the kernel.
@@ -142,7 +143,8 @@ public class Kernel extends Process implements Device {
 
     // Messages
 
-    // GetMapping: Placeholder for obtaining memory mapping.
+    // Given a virtual page number, this method looks inside process page table
+    // and returns the physical page number associated with it.
     private void GetMapping(int virtualPageNum) throws InterruptedException {
         // Look up the value inside the currently running processes page table and return it
         PCB currentProcess = scheduler.runningProcess;
@@ -184,6 +186,7 @@ public class Kernel extends Process implements Device {
     // Finds number of pages to add, adds mapping to the first correctly sized hole in virtual space,
     // marks physical pages as in use, returns start memory address
     private int AllocateMemory(int sizeInBytes) {
+        // Validate size and get process
         if (sizeInBytes <= 0 || sizeInBytes % PAGE_SIZE != 0) {
             System.err.println("Kernel.AllocateMemory Error: Invalid size " + sizeInBytes + ". Must be a positive multiple of " + PAGE_SIZE);
             return -1; // Indicate failure
@@ -195,30 +198,34 @@ public class Kernel extends Process implements Device {
             return -1;
         }
 
-        // Find contiguous physical pages
-        int consecutiveFreeCount = 0;
-        int startPhysicalPage = -1; // initialize to not found
-        for (int i =0; i < freeSpace.length; i++) {
-            if (freeSpace[i]) { // if physical page i is free
-                consecutiveFreeCount++;
-                if (consecutiveFreeCount == numberOfPages) { // Found enough pages
-                    startPhysicalPage = i - numberOfPages + 1;
-                break;
-                }
-            } else {
-                consecutiveFreeCount = 0; // reset counter if page is not free
+        // Find and reserve required physical pages (not necessarily contiguous)
+        List<Integer> allocatedPhysicalPages = new ArrayList<>();
+        int pagesFound = 0;
+        for (int p = 0; p < freeSpace.length && pagesFound < numberOfPages; p++) {
+            if (freeSpace[p] == true) { // Check if physical page 'p' is free
+                pagesFound++; // increment counter
+                freeSpace[p] = false; // Mark as allocated
+                allocatedPhysicalPages.add(p); // Add physical page to list
             }
         }
 
         // Check if physical pages were found
-        if (startPhysicalPage == -1) {
+        if (pagesFound != numberOfPages) {
             System.out.println("Kernel.AllocateMemory: Allocate Memory Failed. Not enough contiguous memory");
+            // Free the reserved physical pages if allocate memory fails.
+            for (int physicalPageToFree : allocatedPhysicalPages) {
+                if (physicalPageToFree >= 0 && physicalPageToFree < freeSpace.length) {
+                    freeSpace[physicalPageToFree] = true;
+                }
+            }
             return -1; // Return -1 for failure
         }
 
+        System.out.println("Kernel.AllocateMemory: Reserved physical pages: " + allocatedPhysicalPages + " for PID " + currentProcess.pid);
+
         // Find contiguous virtual pages
         int startVirtualPage = -1;
-        consecutiveFreeCount = 0;
+        int consecutiveFreeCount = 0;
         for (int i = 0; i < currentProcess.pageTable.length; i++) {
             if (currentProcess.pageTable[i] == -1) {
                 consecutiveFreeCount++;
@@ -234,22 +241,29 @@ public class Kernel extends Process implements Device {
         // check if virtual pages were found
         if (startVirtualPage == -1) {
             System.out.println("Kernel.AllocateMemory: Allocate Memory Failed. Not enough contiguous address space for PID " + currentProcess.pid);
+            // If memory allocation fails, then free up reserved physical pages
+            for (int physicalPageToFree : allocatedPhysicalPages) {
+                if (physicalPageToFree >= 0 && physicalPageToFree < freeSpace.length) {
+                    freeSpace[physicalPageToFree] = true;
+                }
+            }
             return -1;
         }
+        System.out.println("Kernel.AllocateMemory: Found contiguous virtual pages starting at " + startVirtualPage + " for PID " + currentProcess.pid);
 
-        // Map the virtual pages to the physical pages
-        System.out.println("Kernel.AllocateMemory: Mapping virtual pages " + startVirtualPage + ".." + (startVirtualPage + numberOfPages - 1) +
-                " -> physical pages " + startPhysicalPage + ".." + (startPhysicalPage + numberOfPages - 1) + " for PID " + currentProcess.pid);
+        // Map the contiguous virtual pages to the potentially non-contiguous physical pages
         for (int i = 0; i < numberOfPages; i++) {
             int currentVirtualPage = startVirtualPage + i;
-            int currentPhysicalPage = startPhysicalPage + i;
+            int currentPhysicalPage = allocatedPhysicalPages.get(i);
 
             currentProcess.pageTable[currentVirtualPage] = currentPhysicalPage; // Map virtual to physical
-            freeSpace[currentPhysicalPage] = false; // Mark as allocated
+            System.out.print(" V" + currentVirtualPage + "->P" + currentPhysicalPage + " ");
+
         }
+        System.out.println();
 
         int startVirtualAddress = startVirtualPage * PAGE_SIZE;
-        System.out.println("Kernel.AllocateMemory: Allocated " + sizeInBytes + " bytes succesfully. Starting Virtual Address: " + startVirtualAddress);
+        System.out.println("Kernel.AllocateMemory: Allocated " + sizeInBytes + " bytes successfully. Starting Virtual Address: " + startVirtualAddress);
         return startVirtualAddress;
     }
 
@@ -258,17 +272,17 @@ public class Kernel extends Process implements Device {
     // Marks the corresponding physical pages as free.
     private boolean FreeMemory(int pointer, int sizeInBytes) {
 
-        if (sizeInBytes <= 0 || sizeInBytes % PAGE_SIZE != 0) { // Validate size
+        if (sizeInBytes <= 0 || sizeInBytes % PAGE_SIZE != 0) { // Validate size is not less than zero or not a multiple of page size.
             System.err.println("Kernel.FreeMemory Error: Invalid size " + sizeInBytes + ". Must be a positive multiple of " + PAGE_SIZE);
             return false; // Failure
         }
 
-        if (pointer < 0 || pointer % PAGE_SIZE != 0) { // Validate pointer
+        if (pointer < 0 || pointer % PAGE_SIZE != 0) { // Validate pointer is not less than zero or not a multiple of page size
             System.err.println("Kernel.FreeMemory Error: Invalid pointer " + pointer);
             return false;
         }
-        int numberOfPages = sizeInBytes / PAGE_SIZE;
-        int startVirtualPage = pointer / PAGE_SIZE;
+        int numberOfPages = sizeInBytes / PAGE_SIZE; // Calculate number of pages
+        int startVirtualPage = pointer / PAGE_SIZE; // Calculate start virtual page
         int endVirtualPage = startVirtualPage + numberOfPages - 1; // Calculate last virtual page index
 
         PCB currentProcess = scheduler.runningProcess;
@@ -285,6 +299,7 @@ public class Kernel extends Process implements Device {
         System.out.println("Kernel.FreeMemory: Attempting to free virtual pages " + startVirtualPage + ".." + endVirtualPage + " for PID " + currentProcess.pid);
 
         for (int i = startVirtualPage; i <= endVirtualPage; i++) {
+            int currentVirtualPage = i;
             int currentPhysicalPage = currentProcess.pageTable[i];
 
             // Check to see if page was mapped before freeing.
@@ -293,26 +308,43 @@ public class Kernel extends Process implements Device {
                 if (currentPhysicalPage >= 0 && currentPhysicalPage < freeSpace.length) {
                     freeSpace[currentPhysicalPage] = true; // mark as free
                     System.out.println("Kernel.FreeMemory: Freed physical page " + currentPhysicalPage + " for PID " + currentProcess.pid);
+
+                    invalidateTLBEntry(currentVirtualPage); // Invalidate TLB Entry for current virtual page
                 } else {
                     System.out.println("Kernel.FreeMemory: WARNING: Virtual page " + i + " was mapped to invalid physical page " + currentPhysicalPage + " for PID " + currentProcess.pid);
                 }
             } else {
                 System.out.println("Kernel.FreeMemory: Virtual page " + i + " was already free for PID " + currentProcess.pid);
             }
-            currentProcess.pageTable[i] = -1;
+            currentProcess.pageTable[i] = -1; // mark page table entry as free
         }
         System.out.println("Kernel.FreeMemory: Completed freeing request for PID " + currentProcess.pid);
         return true;
     }
+    // Helper method to invalidate TLB entry for the given virtual page
+    private void invalidateTLBEntry(int virtualPageNum) {
+        for (int j = 0; j < Hardware.TLB.length; j++) {
+            if (Hardware.TLB[j][0] == virtualPageNum) {
+                Hardware.TLB[j][0] = Hardware.INVALID_PAGE; // invalidate the entry for the current virtual page
+                Hardware.TLB[j][1] = Hardware.INVALID_PAGE; // physical page
+                System.out.println("Kernel: Invalidated TLB entry for virtual page " + virtualPageNum);
+            }
+        }
 
-    // Free all memory associated with a process. Clearing TLB happens in Scheduler.switchProcess()
+    }
+
+    // Free all memory associated with a process. Clearing TLB also happens in Scheduler.switchProcess()
     private void FreeAllMemory(PCB currentlyRunning) {
         System.out.println("Kernel.FreeAllMemory: Freeing all memory for PID " + currentlyRunning.pid);
+        // Marks all page table entries as free. Marks all physical pages as not in use.
+        // Invalidates TLB entries for any virtual pages that are associated with the current process
         for (int i = 0; i < currentlyRunning.pageTable.length; i++) {
-            int currentPhysicalPage = currentlyRunning.pageTable[i];
+            int currentVirtualPage = i; //
+            int currentPhysicalPage = currentlyRunning.pageTable[currentVirtualPage];
             if (currentPhysicalPage != -1) {
-                currentlyRunning.pageTable[i] = -1;
+                currentlyRunning.pageTable[currentVirtualPage] = -1;
                 freeSpace[currentPhysicalPage] = true;
+                invalidateTLBEntry(currentVirtualPage); // invalidate TLB entry
             }
         }
         System.out.println("Kernel.FreeAllMemory: Finished freeing memory for PID " + currentlyRunning.pid);

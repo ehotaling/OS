@@ -255,7 +255,7 @@ public class OS {
         retVal = null;
     }
 
-    // Returns the start virtual address
+    // Returns the start virtual address.
     public static int AllocateMemory(int size) throws InterruptedException {
         parameters.clear();
         parameters.add(size);
