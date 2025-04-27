@@ -290,4 +290,26 @@ public class Scheduler {
         }
         return -1; // if not found
     }
+
+    /*
+     * Selects a random process from the list of known processes
+     * Used by the Kernel's page swapping mechanism in order to choose a victim process
+     * Returns a randomly selected PCB
+     */
+    public PCB getRandomProcess() {
+        // Get a list of potential victim processes, exclude currently running process and the idle process
+        List<PCB> potentialVictims = new ArrayList<>();
+        for (PCB pcb : processMap.values()) {
+            if (pcb != runningProcess && !(pcb.userlandProcess instanceof IdleProcess)) {
+                potentialVictims.add(pcb);
+            }
+        }
+        if (potentialVictims.isEmpty()) {
+            return null; // no processes available
+        }
+        // Choose a random process from the list of potential victim processes
+        Random random = new Random();
+        int randomPid = random.nextInt(potentialVictims.size());
+        return potentialVictims.get(randomPid);
+    }
 }

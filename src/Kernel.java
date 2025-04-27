@@ -15,7 +15,17 @@ public class Kernel extends Process implements Device {
     public boolean[] freeSpace = new boolean[1024]; // array of booleans to track which pages are in use.
     private static final int PAGE_SIZE = 1024; // Define page size constant
 
-    // Constructor for Kernel, initializes memory free space to false.
+    // VFS file descriptor for the opened swap file. It is initialized to -1 to indicate the file is not open yet
+    private int swapFileId = -1;
+
+    /*
+     * Tracks next available page index in the swap file.
+     * Each time a page is swapped out it is written to this disk page number and this counter is incremented.
+     * Swap space is not reused.
+     */
+    private int nextSwapPageNumber = 0;
+
+    // Constructor for Kernel, initializes memory free space to true.
     public Kernel() {
         System.out.println("Kernel: Kernel constructor called");
         // Initialize freeSpace, true means free
@@ -137,11 +147,51 @@ public class Kernel extends Process implements Device {
         }
     }
 
-    // Paging
+    ////////////////////////////// Memory ///////////////////////////////////////
 
+    /*
+     * Open swap file using VFS and FakeFileSystem
+     * Stores the file descriptor ID and is called during OS.Startup.
+     * Uses single VFS/FFS instance
+     * Requires name for the swap file to be passed in
+     * Returns true if the file was opened successfully and false otherwise.
+     */
+    boolean openSwapFile(String filename) {
+        // Use existing VFS instance
+        // Prefix with "file" for FakeFileSystem as per my implementation
+        swapFileId = vfs.open("file " + filename);
 
+        if (swapFileId < 0) {
+            System.err.println("Kernel.openSwapFile: Could not open swap file " + filename);
+            return false;
+        }
+        System.out.println("Kernel.openSwapFile: Opened swap file " + filename + " with VFS ID " + swapFileId);
+        this.nextSwapPageNumber = 0; // Initialize counter for disk page
+        return true;
+    }
 
-    // Messages
+    // Finds index of first available page frame and marks it as used
+    private int findFreePhysicalPage() {
+        for (int p = 0; p < freeSpace.length; p++) {
+            if (freeSpace[p]) {
+                freeSpace[p] = false; // Mark as used
+                System.out.println("Kernel.findFreePhysicalPage: Found free physical page " + p);
+                return p;
+            }
+        }
+        System.out.println("Kernel.findFreePhysicalPage: No free physical page found");
+        return -1;
+    }
+
+    // Handles case where no physical page is available and we need to swap out a page from a random victim process
+    // Writes the victim page to the swap file and updates its page table entry
+    // Returns index to the page frame that was freed
+    private int pageSwap() {
+        System.out.println("Kernel.pageSwap: No free physical page. Starting page swap");
+        if (swapFileId < 0) {
+
+        }
+    }
 
     // Given a virtual page number, this method looks inside process page table
     // and returns the physical page number associated with it.
@@ -156,7 +206,7 @@ public class Kernel extends Process implements Device {
         }
 
         // Get current process page table
-        int[] pageTable = currentProcess.pageTable;
+        VirtualToPhysicalMapping[] pageTable = currentProcess.pageTable;
 
         // Check bounds for virtualPageNum
         if (virtualPageNum < 0 || virtualPageNum >= pageTable.length) {
@@ -165,7 +215,7 @@ public class Kernel extends Process implements Device {
             return;
         }
 
-        int physicalPageNum = pageTable[virtualPageNum];
+        int physicalPageNum = pageTable[virtualPageNum].physicalPageNumber;
 
         // if there is no mapping that is a seg fault
         if (physicalPageNum == -1) {
@@ -183,8 +233,12 @@ public class Kernel extends Process implements Device {
                 physicalPageNum + " in TLB[" + randomIndex + "]");
     }
 
-    // Finds number of pages to add, adds mapping to the first correctly sized hole in virtual space,
-    // marks physical pages as in use, returns start memory address
+    /*
+     * Allocates a contigous block of virtual memory for the current process using lazy allocation
+     * VirtualToPhysical objects are created and placed in page table for the requested virtual pages
+     * Physical pages are not allocated here
+     * Physical pages will be allocated on demand by GetMapping during the first access (page fault).
+     */
     private int AllocateMemory(int sizeInBytes) {
         // Validate size and get process
         if (sizeInBytes <= 0 || sizeInBytes % PAGE_SIZE != 0) {
@@ -198,70 +252,43 @@ public class Kernel extends Process implements Device {
             return -1;
         }
 
-        // Find and reserve required physical pages (not necessarily contiguous)
-        List<Integer> allocatedPhysicalPages = new ArrayList<>();
-        int pagesFound = 0;
-        for (int p = 0; p < freeSpace.length && pagesFound < numberOfPages; p++) {
-            if (freeSpace[p] == true) { // Check if physical page 'p' is free
-                pagesFound++; // increment counter
-                freeSpace[p] = false; // Mark as allocated
-                allocatedPhysicalPages.add(p); // Add physical page to list
-            }
-        }
-
-        // Check if physical pages were found
-        if (pagesFound != numberOfPages) {
-            System.out.println("Kernel.AllocateMemory: Allocate Memory Failed. Not enough contiguous memory");
-            // Free the reserved physical pages if allocate memory fails.
-            for (int physicalPageToFree : allocatedPhysicalPages) {
-                if (physicalPageToFree >= 0 && physicalPageToFree < freeSpace.length) {
-                    freeSpace[physicalPageToFree] = true;
-                }
-            }
-            return -1; // Return -1 for failure
-        }
-
-        System.out.println("Kernel.AllocateMemory: Reserved physical pages: " + allocatedPhysicalPages + " for PID " + currentProcess.pid);
-
         // Find contiguous virtual pages
+        // Search for a contiguous block of 'null' entries in the page table,
+        // 'Null' means unallocated virtual page
         int startVirtualPage = -1;
-        int consecutiveFreeCount = 0;
-        for (int i = 0; i < currentProcess.pageTable.length; i++) {
-            if (currentProcess.pageTable[i] == -1) {
-                consecutiveFreeCount++;
-                if (consecutiveFreeCount == numberOfPages) {
-                    startVirtualPage = i - numberOfPages + 1; // Found enough pages
+        int consecutiveNullCount = 0;
+        for (int v = 0; v < currentProcess.pageTable.length; v++) {
+            if (currentProcess.pageTable[v] == null) { // Check if virtual page slot is unallocated
+                consecutiveNullCount++;
+                if (consecutiveNullCount == numberOfPages) {
+                    startVirtualPage = v - numberOfPages + 1; // Found enough pages this is start of the block
                     break;
                 }
             } else {
-                consecutiveFreeCount = 0; // reset count
+                consecutiveNullCount = 0; // reset count
             }
         }
 
-        // check if virtual pages were found
+        // check if consecutive virtual pages were found
         if (startVirtualPage == -1) {
             System.out.println("Kernel.AllocateMemory: Allocate Memory Failed. Not enough contiguous address space for PID " + currentProcess.pid);
-            // If memory allocation fails, then free up reserved physical pages
-            for (int physicalPageToFree : allocatedPhysicalPages) {
-                if (physicalPageToFree >= 0 && physicalPageToFree < freeSpace.length) {
-                    freeSpace[physicalPageToFree] = true;
-                }
-            }
-            return -1;
+            return -1; // Return failure
         }
         System.out.println("Kernel.AllocateMemory: Found contiguous virtual pages starting at " + startVirtualPage + " for PID " + currentProcess.pid);
 
-        // Map the contiguous virtual pages to the potentially non-contiguous physical pages
+        // Allocate virtually by creating VirtualToPhysical mapping with no physical page mapping for now
+        // Physical pages will be assigned later by OS.GetMapping on first access (page fault)
+        System.out.println("Kernel.AllocateMemory: Creating virtual mappings for PID " + currentProcess.pid);
         for (int i = 0; i < numberOfPages; i++) {
             int currentVirtualPage = startVirtualPage + i;
-            int currentPhysicalPage = allocatedPhysicalPages.get(i);
-
-            currentProcess.pageTable[currentVirtualPage] = currentPhysicalPage; // Map virtual to physical
-            System.out.print(" V" + currentVirtualPage + "->P" + currentPhysicalPage + " ");
-
+            // Create new VirtualToPhysicalMapping which defaults to -1 for physical and disk page
+            VirtualToPhysicalMapping newMapping = new VirtualToPhysicalMapping();
+            currentProcess.pageTable[currentVirtualPage] = newMapping; // Mapping object placed in page table slot
+            System.out.println("Kernel.AllocateMemory: Virtual Page " + currentVirtualPage + " allocated for PID " + currentProcess.pid);
         }
         System.out.println();
 
+        // Returning start virtual address
         int startVirtualAddress = startVirtualPage * PAGE_SIZE;
         System.out.println("Kernel.AllocateMemory: Allocated " + sizeInBytes + " bytes successfully. Starting Virtual Address: " + startVirtualAddress);
         return startVirtualAddress;
@@ -300,27 +327,41 @@ public class Kernel extends Process implements Device {
 
         for (int i = startVirtualPage; i <= endVirtualPage; i++) {
             int currentVirtualPage = i;
-            int currentPhysicalPage = currentProcess.pageTable[i];
+            VirtualToPhysicalMapping mapping = currentProcess.pageTable[currentVirtualPage];
 
-            // Check to see if page was mapped before freeing.
-            if (currentPhysicalPage != -1) {
-                // Check if current page index is valid
-                if (currentPhysicalPage >= 0 && currentPhysicalPage < freeSpace.length) {
-                    freeSpace[currentPhysicalPage] = true; // mark as free
-                    System.out.println("Kernel.FreeMemory: Freed physical page " + currentPhysicalPage + " for PID " + currentProcess.pid);
-
-                    invalidateTLBEntry(currentVirtualPage); // Invalidate TLB Entry for current virtual page
+            // Check to see if mapping exists
+            if (mapping != null) {
+                // check to see if the page is in physical memory
+                int physicalPage = mapping.physicalPageNumber;
+                if (physicalPage != -1) {
+                    // Ensure physical page index is valid before using it
+                    if (physicalPage > 0 && physicalPage <= freeSpace.length) {
+                        freeSpace[physicalPage] = true; // Mark physical page as free
+                        System.out.println("Kernel.FreeMemory: Freed physical page " + physicalPage + " for PID " + currentProcess.pid);
+                        // Invalidate TLB entry
+                        invalidateTLBEntry(currentVirtualPage);
+                    } else {
+                        // Page table had an invalid physical page number
+                        System.err.println("Kernel.FreeMemory ERROR: Virtual page " + currentVirtualPage + " mapped to invalid physical page " + physicalPage);
+                    }
                 } else {
-                    System.out.println("Kernel.FreeMemory: WARNING: Virtual page " + i + " was mapped to invalid physical page " + currentPhysicalPage + " for PID " + currentProcess.pid);
+                    // Page was allocated virtually but is not in physical RAM
+                    System.out.println("Kernel.FreeMemory: Virtual page " + currentVirtualPage + " was mapped virutally but was not in physical memory.");
                 }
+
+                // Remove mapping from page table. Virtual page will no longer be allocated to the process
+                currentProcess.pageTable[currentVirtualPage] = null;
             } else {
-                System.out.println("Kernel.FreeMemory: Virtual page " + i + " was already free for PID " + currentProcess.pid);
+                // Virtual page in the range was not allocated in the first place
+                System.out.println("Kernel.FreeMemory: Virtual page " + currentVirtualPage + " was not mapped.");
+                // Ensure null
+                currentProcess.pageTable[currentVirtualPage] = null;
             }
-            currentProcess.pageTable[i] = -1; // mark page table entry as free
         }
         System.out.println("Kernel.FreeMemory: Completed freeing request for PID " + currentProcess.pid);
         return true;
     }
+
     // Helper method to invalidate TLB entry for the given virtual page
     private void invalidateTLBEntry(int virtualPageNum) {
         for (int j = 0; j < Hardware.TLB.length; j++) {
@@ -339,12 +380,23 @@ public class Kernel extends Process implements Device {
         // Marks all page table entries as free. Marks all physical pages as not in use.
         // Invalidates TLB entries for any virtual pages that are associated with the current process
         for (int i = 0; i < currentlyRunning.pageTable.length; i++) {
-            int currentVirtualPage = i; //
-            int currentPhysicalPage = currentlyRunning.pageTable[currentVirtualPage];
-            if (currentPhysicalPage != -1) {
-                currentlyRunning.pageTable[currentVirtualPage] = -1;
-                freeSpace[currentPhysicalPage] = true;
-                invalidateTLBEntry(currentVirtualPage); // invalidate TLB entry
+            VirtualToPhysicalMapping mapping = currentlyRunning.pageTable[i];
+            if (mapping != null) {
+                int physicalPage = mapping.physicalPageNumber;
+                if (physicalPage != -1) {
+                    if (physicalPage > 0 && physicalPage <= freeSpace.length) {
+                        if (!freeSpace[physicalPage]) {
+                            freeSpace[physicalPage] = true; // Mark physical page as free
+                        }
+                    } else {
+                        // Physical page number was invalid
+                        System.out.println("Kernel.FreeAllMemory: WARNING: Invalid physical page: " + physicalPage + " for PID " + currentlyRunning + " for virtual page " + i);
+                    }
+                    // Invalidate TLB
+                    invalidateTLBEntry(i);
+                }
+                // Remove mapping
+                currentlyRunning.pageTable[i] = null;
             }
         }
         System.out.println("Kernel.FreeAllMemory: Finished freeing memory for PID " + currentlyRunning.pid);

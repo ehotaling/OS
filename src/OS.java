@@ -76,6 +76,16 @@ public class OS {
         ki = new Kernel();
         // Pass kernel reference to scheduler, which will later manage the PCB (including tracking open device ids)
         ki.getScheduler().setKernel(ki);
+
+        // Request the kernel opens the swap file
+        boolean swapOpened = ki.openSwapFile("swapfile.swp"); // Kernel opens the swap file
+        if (!swapOpened) {
+            // OS needs the swap file
+            System.err.println("OS.Startup FATAL ERROR: Could not open swap file! Halting.");
+            return;
+        }
+        System.out.println("OS.Startup: Swap file opened successfully.");
+
         System.out.println("OS.Startup: Kernel initialized");
         System.out.println("OS.Startup: Creating IdleProcess.");
         CreateProcess(new IdleProcess(), PriorityType.background);
