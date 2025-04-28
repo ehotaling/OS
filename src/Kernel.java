@@ -229,7 +229,8 @@ public class Kernel extends Process implements Device {
 
         // If unable to get free physical page, then perform a page swap
         if (freePhysicalPage == -1) {
-            freePhysicalPage = findFreePhysicalPage();
+            System.out.println("Kernel.GetMapping: No free page found, calling performPageSwap...");
+            freePhysicalPage = performPageSwap();
             if (freePhysicalPage == -1) {
                 // Page swap was unsuccessful
                 System.err.println("Kernel.GetMapping: ERROR: Page swap failed for PID "
@@ -516,7 +517,7 @@ public class Kernel extends Process implements Device {
                 int physicalPage = mapping.physicalPageNumber;
                 if (physicalPage != -1) {
                     // Ensure physical page index is valid before using it
-                    if (physicalPage > 0 && physicalPage <= freeSpace.length) {
+                    if (physicalPage >= 0 && physicalPage <= freeSpace.length) {
                         freeSpace[physicalPage] = true; // Mark physical page as free
                         System.out.println("Kernel.FreeMemory: Freed physical page " + physicalPage + " for PID " + currentProcess.pid);
                         // Invalidate TLB entry
@@ -565,7 +566,7 @@ public class Kernel extends Process implements Device {
             if (mapping != null) {
                 int physicalPage = mapping.physicalPageNumber;
                 if (physicalPage != -1) {
-                    if (physicalPage > 0 && physicalPage <= freeSpace.length) {
+                    if (physicalPage >= 0 && physicalPage <= freeSpace.length) {
                         if (!freeSpace[physicalPage]) {
                             freeSpace[physicalPage] = true; // Mark physical page as free
                         }
