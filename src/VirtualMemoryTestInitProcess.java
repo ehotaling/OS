@@ -2,7 +2,7 @@ public class VirtualMemoryTestInitProcess extends UserlandProcess {
 
     // We have 1024 physical pages. Each PiggyProcess uses 100 virtual pages.
     // More than 10 PiggyProcesses actively touching memory should force swapping.
-    private static final int NUM_PIGGIES = 10;
+    private static final int NUM_PIGGIES = 15; // 15 to make sure we force swapping
 
     @Override
     public void main() throws InterruptedException {

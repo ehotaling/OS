@@ -10,7 +10,7 @@ public class PiggyProcess extends UserlandProcess {
         byte identifierByte = (byte) (myPid % 256); // Use PID as identifier
         System.out.println("PiggyProcess [" + myPid + "]: Starting, using identifier " + identifierByte);
 
-        // 1. Allocate maximum virtual memory
+        // Allocate maximum virtual memory
         System.out.println("PiggyProcess [" + myPid + "]: Allocating " + ALLOC_SIZE + " bytes...");
         int baseAddress = OS.AllocateMemory(ALLOC_SIZE);
         if (baseAddress == -1) {
@@ -20,7 +20,7 @@ public class PiggyProcess extends UserlandProcess {
         }
         System.out.println("PiggyProcess [" + myPid + "]: Allocated memory starting at VA " + baseAddress);
 
-        // 2. Touch every page by writing to it (Force Page Faults)
+        // Touch every page by writing to it and force page faults
         System.out.println("PiggyProcess [" + myPid + "]: Writing identifier to all " + VIRTUAL_PAGES + " pages...");
         for (int i = 0; i < VIRTUAL_PAGES; i++) {
             int address = baseAddress + i * PAGE_SIZE;
@@ -49,11 +49,8 @@ public class PiggyProcess extends UserlandProcess {
                 if (valueRead != identifierByte) {
                     System.err.println("\nPiggyProcess [" + myPid + "]: FAILED verification at VPage " + i + " (VA " + address + ")! Expected " + identifierByte + ", got " + valueRead);
                     success = false;
-                    // Decide if you want to break on first error or check all pages
-                    // break;
                 }
-                // Optional: Print progress
-                // System.out.print("R" + i + " ");
+
 
             } catch (Exception e) {
                 System.err.println("\nPiggyProcess [" + myPid + "]: ERROR reading from VPage " + i + " (VA " + address + "): " + e.getMessage());
@@ -72,7 +69,9 @@ public class PiggyProcess extends UserlandProcess {
             System.err.println("\nPiggyProcess [" + myPid + "]: Verification FAILED for one or more pages.");
         }
 
-        // 4. Exit cleanly
+        // Sleep for a while and hold onto the memory.
+        OS.Sleep(500);
+        // Exit cleanly
         System.out.println("PiggyProcess [" + myPid + "]: Exiting.");
         OS.Exit();
     }

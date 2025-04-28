@@ -406,9 +406,10 @@ public class Kernel extends Process implements Device {
 
             // Update victim mapping
             victimMapping.physicalPageNumber = -1;
+            invalidateTLBEntry(victimVirtualPage);
 
             // Return the newly free physical page number
-            System.out.println("Kernel.performPageSwap: Succesfully swapped out PID " + victimProcess.pid +
+            System.out.println("Kernel.performPageSwap: Successfully swapped out PID " + victimProcess.pid +
                     " Virtual page" + victimVirtualPage + " Physical page " + victimPhysicalPage + " is now free.");
             return victimPhysicalPage;
         }
@@ -517,7 +518,7 @@ public class Kernel extends Process implements Device {
                 int physicalPage = mapping.physicalPageNumber;
                 if (physicalPage != -1) {
                     // Ensure physical page index is valid before using it
-                    if (physicalPage >= 0 && physicalPage <= freeSpace.length) {
+                    if (physicalPage >= 0 && physicalPage < freeSpace.length) {
                         freeSpace[physicalPage] = true; // Mark physical page as free
                         System.out.println("Kernel.FreeMemory: Freed physical page " + physicalPage + " for PID " + currentProcess.pid);
                         // Invalidate TLB entry
@@ -566,7 +567,7 @@ public class Kernel extends Process implements Device {
             if (mapping != null) {
                 int physicalPage = mapping.physicalPageNumber;
                 if (physicalPage != -1) {
-                    if (physicalPage >= 0 && physicalPage <= freeSpace.length) {
+                    if (physicalPage >= 0 && physicalPage < freeSpace.length) {
                         if (!freeSpace[physicalPage]) {
                             freeSpace[physicalPage] = true; // Mark physical page as free
                         }
