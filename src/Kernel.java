@@ -1,7 +1,4 @@
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
 
 public class Kernel extends Process implements Device {
 
@@ -24,6 +21,8 @@ public class Kernel extends Process implements Device {
      * Swap space is not reused.
      */
     private int nextSwapPageNumber = 0;
+
+    private final Random random = new Random();
 
     // Constructor for Kernel, initializes memory free space to true.
     public Kernel() {
@@ -170,31 +169,18 @@ public class Kernel extends Process implements Device {
         return true;
     }
 
-    // Finds index of first available page frame and marks it as used
-    private int findFreePhysicalPage() {
-        for (int p = 0; p < freeSpace.length; p++) {
-            if (freeSpace[p]) {
-                freeSpace[p] = false; // Mark as used
-                System.out.println("Kernel.findFreePhysicalPage: Found free physical page " + p);
-                return p;
-            }
-        }
-        System.out.println("Kernel.findFreePhysicalPage: No free physical page found");
-        return -1;
-    }
-
-    // Handles case where no physical page is available and we need to swap out a page from a random victim process
-    // Writes the victim page to the swap file and updates its page table entry
-    // Returns index to the page frame that was freed
-    private int pageSwap() {
-        System.out.println("Kernel.pageSwap: No free physical page. Starting page swap");
-        if (swapFileId < 0) {
-
-        }
-    }
-
-    // Given a virtual page number, this method looks inside process page table
-    // and returns the physical page number associated with it.
+    /*
+     * Handles mapping of a virtual to physical page, including page faults
+     * Called by Hardware when there is a TLB miss
+     * Finds VirtualToPhysical Mapping for a given virtual page
+     * If mapping doesn't exist (null) that is a seg fault
+     * If mapping exists and page is valid (!= -1), update TLB and return
+     * If mapping exists but physical page is invalid (-1) that is a Page Fault:
+     * Find physical data frame, if no free frame perform page swap to get one
+     * Assign physical frame number to the mapping
+     * Load data from swap file or zero fill the physical frame
+     * Then update TLB with new mapping
+     */
     private void GetMapping(int virtualPageNum) throws InterruptedException {
         // Look up the value inside the currently running processes page table and return it
         PCB currentProcess = scheduler.runningProcess;
@@ -215,26 +201,221 @@ public class Kernel extends Process implements Device {
             return;
         }
 
-        int physicalPageNum = pageTable[virtualPageNum].physicalPageNumber;
+        VirtualToPhysicalMapping mapping = pageTable[virtualPageNum];
 
         // if there is no mapping that is a seg fault
-        if (physicalPageNum == -1) {
-            System.out.println("Kernel.GetMapping: Seg fault: Unmapped page " + virtualPageNum);
+        if (mapping == null) {
+            System.out.println("Kernel.GetMapping: Seg fault: Unmapped page " + virtualPageNum + " for PID: " + currentProcess.pid);
             Exit(); // Will exit current process
             return;
         }
 
-        // Otherwise, update random TLB entry
-        int randomIndex = (int) (Math.random() * 2); // for 0 or 1
-        Hardware.TLB[randomIndex][0] = virtualPageNum;
-        Hardware.TLB[randomIndex][1] = physicalPageNum;
 
-        System.out.println("Kernel.GetMapping: Mapped virtual page " + virtualPageNum + " to physical page " +
-                physicalPageNum + " in TLB[" + randomIndex + "]");
+        // If mapping exists and page is valid (!= -1), can update TLB and return
+        if (mapping.physicalPageNumber != -1) {
+            System.out.println("Kernel.GetMapping: Page is already in memory for PID " + currentProcess.pid +
+                    " Virtual page " + virtualPageNum + " Physical page " + mapping.physicalPageNumber);
+            int randomIndex = (int) (Math.random() * 2); // for 0 or 1
+            Hardware.TLB[randomIndex][0] = virtualPageNum;
+            Hardware.TLB[randomIndex][1] = mapping.physicalPageNumber;
+
+            System.out.println("Kernel.GetMapping: Updated TLB[" + randomIndex + "]");
+            return;
+        }
+
+        // If mapping exists and physical page mapping is invalid (-1) that is a page fault
+        // First, attempt to get free physical page
+        int freePhysicalPage = findFreePhysicalPage();
+
+        // If unable to get free physical page, then perform a page swap
+        if (freePhysicalPage == -1) {
+            freePhysicalPage = findFreePhysicalPage();
+            if (freePhysicalPage == -1) {
+                // Page swap was unsuccessful
+                System.err.println("Kernel.GetMapping: ERROR: Page swap failed for PID "
+                        + currentProcess.pid + " Virtual page " + virtualPageNum + ". Terminating process.");
+                Exit();
+                return;
+            }
+        }
+
+        // Assign physical frame to the mapping
+        mapping.physicalPageNumber = freePhysicalPage;
+        System.out.println("Kernel.GetMapping: Assigned physical page " + freePhysicalPage + " to virtual page " + virtualPageNum + " for PID " + currentProcess.pid);
+
+        // Load data into the frame
+        if (mapping.diskPageNumber != -1) { // This page was previously swapped out
+            // Load from swap file
+            System.out.println("Kernel.GetMapping: Loading virtual page " + virtualPageNum + " from swap slot " +
+                    mapping.diskPageNumber + " into physical page " + freePhysicalPage);
+
+            // Calculate byte offset within the swap file where this page's data starts.
+            // mapping.diskPageNumber is like the page index within the swap file.
+            long diskOffset = (long)mapping.diskPageNumber * PAGE_SIZE;
+
+            // Position vfs's pointer for the swap file to the correct location
+            vfs.seek(swapFileId, (int) diskOffset);
+
+            // Read one page of data from the swap file beginning at the offset
+            byte[] pageData = vfs.read(swapFileId, PAGE_SIZE);
+
+            // Error handling
+            if (pageData == null) {
+                System.err.println("Kernel.GetMapping: ERROR: Failed to read full page from swap file for disk page "
+                        + mapping.diskPageNumber + ". Filling with zeroes instead.");
+                // Rather than crashing return all zeroes for the page data
+                pageData = new byte[PAGE_SIZE]; // This defaults to all zeroes.
+            }
+
+            // Calculating start physical address
+            int physicalAddressStart = freePhysicalPage * PAGE_SIZE;
+
+            // Copy data from pageData buffer into actual physical memory
+            try {
+                if (physicalAddressStart >= 0 && (physicalAddressStart + PAGE_SIZE) <= Hardware.PhysicalMemory.length) {
+                    System.arraycopy(pageData, 0, Hardware.PhysicalMemory, physicalAddressStart, PAGE_SIZE);
+                } else {
+                    System.err.println("Kernel.GetMapping: ERROR: Invalid physical address " + freePhysicalPage + " during swap in.");
+                }
+            } catch (ArrayIndexOutOfBoundsException e) {
+                System.err.println("Kernel.GetMapping: ERROR: Array index out of bounds during physical memory copy for swap in Physical page " + freePhysicalPage);
+                e.printStackTrace();
+            }
+        } else {
+            // When mapping.diskPageNumber = -1 (page was never swapped out)
+            // This case occurs during the first access to a page that was lazy allocated
+
+            // Must provide a zero filled page back to the process
+            System.err.println("Kernel.GetMapping: Zero-filling physical page " + freePhysicalPage +
+                    " for virtual page " + virtualPageNum + ". First access or no disk backing.");
+            // Creating a zero-filled buffer
+            byte[] zeroPage = new byte[PAGE_SIZE];
+
+            // Calculate starting Physical address
+            int startPhysicalAddress = freePhysicalPage * PAGE_SIZE;
+
+            // Copy zeroes into physical memory frame
+            try {
+                if (startPhysicalAddress >= 0 && (startPhysicalAddress + PAGE_SIZE) <= Hardware.PhysicalMemory.length) {
+                    System.arraycopy(zeroPage, 0, Hardware.PhysicalMemory, startPhysicalAddress, PAGE_SIZE);
+                }
+            } catch (ArrayIndexOutOfBoundsException e) {
+                System.err.println("Kernel.GetMapping: ERROR: Array index out of bounds during physical memory copy for zero fill in Physical page " + freePhysicalPage);
+                e.printStackTrace();
+            }
+        }
+
+        // Update TLB with new mapping
+        System.out.println("Kernel.GetMapping: Page Fault handled. Updating TLB for virtual page " + virtualPageNum + " to physical page " + freePhysicalPage);
+        int randomIndex = random.nextInt(Hardware.TLB.length);
+        Hardware.TLB[randomIndex][0] = virtualPageNum;
+        Hardware.TLB[randomIndex][1] = freePhysicalPage;
+        System.out.println("Kernel.GetMapping: Updated TLB[" + randomIndex + "]");
+    }
+
+    // Finds index of first available page frame and marks it as used
+    // Returns index of physical page from freeSpace
+    private int findFreePhysicalPage() {
+        for (int p = 0; p < freeSpace.length; p++) {
+            if (freeSpace[p]) {
+                freeSpace[p] = false; // Mark as used
+                System.out.println("Kernel.findFreePhysicalPage: Found free physical page " + p);
+                return p;
+            }
+        }
+        System.out.println("Kernel.findFreePhysicalPage: No free physical page found");
+        return -1;
+    }
+
+    // Handles case where no physical page is available, and we need to swap out a page from a random victim process
+    // Writes the victim page to the swap file and updates its page table entry
+    // Returns index to the page frame that was freed or -1 if error
+    private int performPageSwap() {
+        System.out.println("Kernel.performPageSwap: No free physical pages. Starting page swap");
+        if (swapFileId < 0) {
+            System.err.println("Kernel.performPageSwap: ERROR: Swap file not open.");
+            return -1;
+        }
+
+        while (true) {
+            PCB victimProcess = scheduler.getRandomProcess();
+            if (victimProcess == null) {
+                System.err.println("Kernel.performPageSwap: ERROR: No process available");
+                return -1;
+            }
+
+            // Find page in victim process that is currently in physical memory
+            VirtualToPhysicalMapping victimMapping = null;
+            int victimVirtualPage = -1;
+            int victimPhysicalPage = -1;
+
+            for (int i = 0; i < victimProcess.pageTable.length; i++) {
+                VirtualToPhysicalMapping mapping = victimProcess.pageTable[i];
+                if (mapping != null && mapping.physicalPageNumber != -1) {
+                    victimMapping = mapping;
+                    victimVirtualPage = i;
+                    victimPhysicalPage = mapping.physicalPageNumber;
+                    System.out.println("Kernel.performPageSwap: Found victim page: PID " +
+                            victimProcess.pid + " virtual page: " + victimVirtualPage + " physical page: " + victimPhysicalPage);
+                    break; // Found page to swap
+                }
+            }
+            if (victimMapping == null) {
+                System.out.println("Kernel.performPageSwap: PID " + victimProcess.pid + " had no pages in physical " +
+                        "memory. Trying another victim.");
+                continue;
+            }
+
+            // Page is found so proceed with swap
+            // Assign disk location
+            if (victimMapping.diskPageNumber == -1) {
+                victimMapping.diskPageNumber = nextSwapPageNumber++;
+                System.out.println("Kernel.performPageSwap: Assigning swap slot " + victimMapping.diskPageNumber +
+                        " for PID " + victimProcess.pid + " virtual page " + victimVirtualPage);
+            }
+
+            // Prepare the data buffer
+            byte[] pageData = new byte[PAGE_SIZE];
+            int physicalAddressStart = victimPhysicalPage * PAGE_SIZE;
+            try {
+                // Check bounds before copying
+                if (physicalAddressStart >= 0 && (physicalAddressStart + PAGE_SIZE) <= Hardware.PhysicalMemory.length) {
+                    System.arraycopy(Hardware.PhysicalMemory, physicalAddressStart, pageData, 0, PAGE_SIZE);
+                    System.out.println("Kernel.performPageSwap: Copied data from physical page " + victimPhysicalPage);
+                } else {
+                    System.err.println("Kernel.performPageSwap ERROR: Invalid physical address calculation for victim P" + victimPhysicalPage);
+                    continue; // Try another victim
+                }
+            } catch (ArrayIndexOutOfBoundsException e) {
+                System.err.println("Kernel.performPageSwap ERROR: Array index out of bounds during physical memory copy for P" + victimPhysicalPage);
+                e.printStackTrace();
+                continue; // Try another victim
+            }
+
+            // Write the data to the swap file
+            long diskOffset = (long)victimMapping.diskPageNumber * PAGE_SIZE;
+            System.out.println("Kernel.performPageSwap: Seeking swap file to offset " + diskOffset);
+            vfs.seek(swapFileId, (int) diskOffset);
+            int bytesWritten = vfs.write(swapFileId, pageData);
+            if (bytesWritten != PAGE_SIZE) {
+                System.err.println("Kernel.performPageSwap ERROR: Failed to write complete page to swap file. Instead wrote " + bytesWritten);
+                continue; // Find another victim...
+            }
+            System.out.println("Kernel.performPageSwap: Wrote page data for PID " + victimProcess.pid + " V" + victimVirtualPage + " to swap slot " + victimMapping.diskPageNumber);
+
+            // Update victim mapping
+            victimMapping.physicalPageNumber = -1;
+
+            // Return the newly free physical page number
+            System.out.println("Kernel.performPageSwap: Succesfully swapped out PID " + victimProcess.pid +
+                    " Virtual page" + victimVirtualPage + " Physical page " + victimPhysicalPage + " is now free.");
+            return victimPhysicalPage;
+        }
+
     }
 
     /*
-     * Allocates a contigous block of virtual memory for the current process using lazy allocation
+     * Allocates a contiguous block of virtual memory for the current process using lazy allocation
      * VirtualToPhysical objects are created and placed in page table for the requested virtual pages
      * Physical pages are not allocated here
      * Physical pages will be allocated on demand by GetMapping during the first access (page fault).
