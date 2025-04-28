@@ -1,6 +1,6 @@
 public class VirtualMemoryTestInitProcess extends UserlandProcess {
 
-    // We have 1024 physical pages. Each PiggyProcess uses 100 virtual pages.
+    // There are 1024 physical pages. Each PiggyProcess uses 100 virtual pages.
     // More than 10 PiggyProcesses actively touching memory should force swapping.
     private static final int NUM_PIGGIES = 15; // 15 to make sure we force swapping
 
@@ -17,7 +17,7 @@ public class VirtualMemoryTestInitProcess extends UserlandProcess {
             if (pid == -1) {
                 System.err.println("VirtualMemoryTestInitProcess: Failed to create PiggyProcess #" + (i+1));
             }
-            cooperate(); // Give scheduler a chance
+            cooperate();
         }
 
         System.out.println("VirtualMemoryTestInitProcess: All PiggyProcesses created. InitProcess exiting.");
