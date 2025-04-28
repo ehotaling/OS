@@ -15,10 +15,10 @@ public class PCB { // Process Control Block
 
     // Only kernel should manage PCB's
     PCB(UserlandProcess up, OS.PriorityType priority) {
-        System.out.println("PCB: Creating PCB for process: "
-                + up.getClass().getSimpleName()
-                + ", priority: " + priority
-                + ", PID: " + nextPid);
+//        System.out.println("PCB: Creating PCB for process: "
+//                + up.getClass().getSimpleName()
+//                + ", priority: " + priority
+//                + ", PID: " + nextPid);
 
         pid = nextPid++; // Process gets a pid, next process gets the next pid up
         this.userlandProcess = up;
@@ -38,8 +38,8 @@ public class PCB { // Process Control Block
             openDevices[i] = -1;
         }
 
-        System.out.println("PCB: PCB created for: "
-                + up.getClass().getSimpleName() + ", PID: " + pid);
+//        System.out.println("PCB: PCB created for: "
+//                + up.getClass().getSimpleName() + ", PID: " + pid);
     }
 
 

@@ -1,5 +1,3 @@
-import jdk.swing.interop.SwingInterOpUtils;
-
 import java.util.concurrent.Semaphore;
 
 public abstract class Process implements Runnable {
@@ -19,7 +17,7 @@ public abstract class Process implements Runnable {
     // Process constructor.
     // Initializes the thread for the process and prints debug info.
     public Process() {
-        System.out.println("Process: Process constructor for: " + this.getClass().getSimpleName());
+        // System.out.println("Process: Process constructor for: " + this.getClass().getSimpleName());
         this.thread = new Thread(this);
     }
 
@@ -56,14 +54,14 @@ public abstract class Process implements Runnable {
     // This method starts the thread and releases a permit so that the process can begin execution.
     // It simulates the OS starting a new userland process.
     public void start() {
-        System.out.println("Process.start: Starting process: " + this.getClass().getSimpleName());
+        // System.out.println("Process.start: Starting process: " + this.getClass().getSimpleName());
         if (!thread.isAlive()) {
-            System.out.println("Process.start: Starting thread: " + this.getClass().getSimpleName());
+            // System.out.println("Process.start: Starting thread: " + this.getClass().getSimpleName());
             thread.start();
         }
-        System.out.println("Process.start: Semaphore available before calling available.release(): " + available.availablePermits());
+        // System.out.println("Process.start: Semaphore available before calling available.release(): " + available.availablePermits());
         available.release();
-        System.out.println("Process.start: Semaphore available after calling available.release(): " + available.availablePermits());
+        // System.out.println("Process.start: Semaphore available after calling available.release(): " + available.availablePermits());
     }
 
 
@@ -71,7 +69,7 @@ public abstract class Process implements Runnable {
     // This effectively blocks the process until the semaphore is released again by the scheduler.
     public void stop() {
         try {
-            System.out.println("Process.stop: " + this.getClass().getSimpleName() + ": stopping process: " + this.getClass().getSimpleName());
+            // System.out.println("Process.stop: " + this.getClass().getSimpleName() + ": stopping process: " + this.getClass().getSimpleName());
             available.acquire();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -84,7 +82,7 @@ public abstract class Process implements Runnable {
     // It waits (by acquiring the semaphore) until the process is allowed to run, then calls its main() method.
     @Override
     public void run() {
-        System.out.println("Process.run: Run method invoked for process: " + this.getClass().getSimpleName());
+        // System.out.println("Process.run: Run method invoked for process: " + this.getClass().getSimpleName());
         try {
             available.acquire();
             if (exited) {
@@ -108,8 +106,8 @@ public abstract class Process implements Runnable {
     // Otherwise, it prints a message indicating it is cooperating (i.e., continuing execution).
     public void cooperate() throws InterruptedException {
         if (isExpired) {
-            System.out.println("Process.cooperate: Process " + this.getClass().getSimpleName()
-                    + " is expired, switching process.");
+//            System.out.println("Process.cooperate: Process " + this.getClass().getSimpleName()
+//                    + " is expired, switching process.");
             isExpired = false;
             OS.switchProcess();
         }
@@ -129,7 +127,7 @@ public abstract class Process implements Runnable {
     // Make the thread alive but not running
     public void startThread() {
         if (!thread.isAlive()) {
-            System.out.println("Process.startThread: Starting thread: " + this.getClass().getSimpleName());
+            // System.out.println("Process.startThread: Starting thread: " + this.getClass().getSimpleName());
             thread.start();
         }
     }

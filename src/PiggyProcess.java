@@ -32,7 +32,7 @@ public class PiggyProcess extends UserlandProcess {
             }
             if (i % 10 == 0) { // Cooperate periodically
                 cooperate();
-                System.out.print("."); // Indicate progress less verbosely
+                // System.out.print("."); // Indicate progress
             }
         }
         System.out.println("\nPiggyProcess [" + myPid + "]: Finished writing to all pages.");
@@ -59,7 +59,7 @@ public class PiggyProcess extends UserlandProcess {
             }
             if (i % 10 == 0) { // Cooperate periodically
                 cooperate();
-                System.out.print("*"); // Indicate progress
+                // System.out.print("*"); // Indicate progress
             }
         }
 

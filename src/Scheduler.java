@@ -64,7 +64,7 @@ public class Scheduler {
 
     // Scheduler constructor.
     public Scheduler() {
-        System.out.println("Scheduler: Scheduler constructor called");
+        // System.out.println("Scheduler: Scheduler constructor called");
         sleepingProcesses = new PriorityQueue<>(Comparator.comparingLong(s -> s.wakeUpTime));
         // Set up a periodic interrupt every 250ms.
         TimerTask interrupt = new TimerTask() {
@@ -76,7 +76,7 @@ public class Scheduler {
             }
         };
         timer.schedule(interrupt, 250, 250);
-        System.out.println("Scheduler: Timer task scheduled");
+        // System.out.println("Scheduler: Timer task scheduled");
     }
 
     // Setter for kernel reference.
@@ -86,7 +86,7 @@ public class Scheduler {
 
     // Create a process and add it to the proper queue.
     public int createProcess(UserlandProcess up, OS.PriorityType p) throws InterruptedException {
-        System.out.println("Scheduler.createProcess: Creating process " + up.getClass().getSimpleName() + " with priority " + p);
+        // System.out.println("Scheduler.createProcess: Creating process " + up.getClass().getSimpleName() + " with priority " + p);
 
         PCB newProcess = new PCB(up, p);
 
@@ -157,8 +157,8 @@ public class Scheduler {
             case interactive -> interactiveQueue.add(process);
             case background -> backgroundQueue.add(process);
         }
-        System.out.println("Scheduler.createProcess: Adding process "
-                + process.userlandProcess.getClass().getSimpleName() + " to queue: " + p);
+//        System.out.println("Scheduler.createProcess: Adding process "
+//                + process.userlandProcess.getClass().getSimpleName() + " to queue: " + p);
     }
 
     // Helper to add process to queue using its current priority.
@@ -239,8 +239,8 @@ public class Scheduler {
             if (!pcb.isDone()) {
                 return pcb;
             } else {
-                System.out.println("Scheduler.pollNext: Discarding finished process "
-                        + pcb.userlandProcess.getClass().getSimpleName() + " PID " + pcb.pid);
+//                System.out.println("Scheduler.pollNext: Discarding finished process "
+//                        + pcb.userlandProcess.getClass().getSimpleName() + " PID " + pcb.pid);
             }
         }
         return null;
@@ -268,7 +268,7 @@ public class Scheduler {
     // Wakes up process that are waiting for messages
     public void wakeUpProcess(PCB process) {
         addProcessToQueue(process);
-        System.out.println("Scheduler: Process " + process.pid + " has been woken up from message waiting.");
+        // System.out.println("Scheduler: Process " + process.pid + " has been woken up from message waiting.");
     }
 
 

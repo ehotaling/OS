@@ -26,7 +26,7 @@ public class Kernel extends Process implements Device {
 
     // Constructor for Kernel, initializes memory free space to true.
     public Kernel() {
-        System.out.println("Kernel: Kernel constructor called");
+        // System.out.println("Kernel: Kernel constructor called");
         // Initialize freeSpace, true means free
         Arrays.fill(freeSpace, true);
     }
@@ -36,99 +36,99 @@ public class Kernel extends Process implements Device {
     // simulating a soft interrupt mechanism where userland calls are handled in privileged mode.
     @Override
     public void main() throws InterruptedException {
-        System.out.println("Kernel.main: Kernel main loop started");
+        // System.out.println("Kernel.main: Kernel main loop started");
         while (true) {
             // Check if there is a pending system call from the OS.
             if (OS.currentCall != null) {
                 // Process the system call based on its type.
                 switch (OS.currentCall) {
                     case CreateProcess -> {
-                        System.out.println("Kernel.main: System call is CreateProcess");
+                        // System.out.println("Kernel.main: System call is CreateProcess");
                         // Delegate process creation to the scheduler and return the new PID.
                         OS.retVal = CreateProcess((UserlandProcess) OS.parameters.get(0), (OS.PriorityType) OS.parameters.get(1));
                         System.out.println("Kernel.main: CreateProcess returned PID: " + OS.retVal);
                     }
                     case SwitchProcess -> {
-                        System.out.println("Kernel.main: System call is SwitchProcess");
+                        // System.out.println("Kernel.main: System call is SwitchProcess");
                         // Switch to the next process using the scheduler.
                         SwitchProcess();
                         OS.retVal = 1;
                     }
                     case Sleep -> {
-                        System.out.println("Kernel.main: System call is Sleep");
+                        // System.out.println("Kernel.main: System call is Sleep");
                         // Pause the current process for a specified duration.
                         Sleep((int) OS.parameters.get(0));
                         OS.retVal = 1;
                     }
                     case GetPID -> {
-                        System.out.println("Kernel.main: System call is GetPID");
+                        // System.out.println("Kernel.main: System call is GetPID");
                         // Retrieve the PID of the currently running process.
                         OS.retVal = GetPid();
                     }
                     case Exit -> {
-                        System.out.println("Kernel.main: System call is Exit");
+                        // System.out.println("Kernel.main: System call is Exit");
                         // Handle process exit: mark the process as done, remove it from the scheduler, and switch.
                         Exit();
                         OS.retVal = 1;
                     }
                     // Device system calls:
                     case Open -> {
-                        System.out.println("Kernel.main: System call is Open");
+                        // System.out.println("Kernel.main: System call is Open");
                         // Open a device (e.g., file or random device) using the VFS.
                         OS.retVal = open((String) OS.parameters.get(0));
                     }
                     case Close -> {
-                        System.out.println("Kernel.main: System call is Close");
+                        // System.out.println("Kernel.main: System call is Close");
                         // Close a device and free its slot in the current process.
                         close((int) OS.parameters.getFirst());
                         OS.retVal = 1;
                     }
                     case Read -> {
-                        System.out.println("Kernel.main: System call is Read");
+                        // System.out.println("Kernel.main: System call is Read");
                         // Read data from a device via the VFS.
                         OS.retVal = read((int) OS.parameters.getFirst(), (int) OS.parameters.get(1));
                     }
                     case Seek -> {
-                        System.out.println("Kernel.main: System call is Seek");
+                        // System.out.println("Kernel.main: System call is Seek");
                         // Change the read/write position for a device.
                         seek((int) OS.parameters.get(0), (int) OS.parameters.get(1));
                         OS.retVal = 1;
                     }
                     case Write -> {
-                        System.out.println("Kernel.main: System call is Write");
+                        // System.out.println("Kernel.main: System call is Write");
                         // Write data to a device and return the number of bytes written.
                         OS.retVal = write((int) OS.parameters.get(0), (byte[]) OS.parameters.get(1));
                     }
 
                     case SendMessage -> {
-                        System.out.println("Kernel.main: System call is SendMessage");
+                        // System.out.println("Kernel.main: System call is SendMessage");
                         // OS.parameters.get(0) is expected to be a KernelMessage.
                         SendMessage((KernelMessage) OS.parameters.getFirst());
                         OS.retVal = 1;
                     }
                     case WaitForMessage -> {
-                        System.out.println("Kernel.main: System call is WaitForMessage");
+                        // System.out.println("Kernel.main: System call is WaitForMessage");
                         var retVal = WaitForMessage();
                         if (retVal != null)
                             OS.retVal = retVal;
                     }
                     case GetPIDByName -> {
-                        System.out.println("Kernel.main: System call is GetPIDByName");
+                        // System.out.println("Kernel.main: System call is GetPIDByName");
                         // OS.parameters.get(0) is expected to be a String with the process name.
                         OS.retVal = GetPidByName((String) OS.parameters.getFirst());
                     }
                     case GetMapping -> {
-                        System.out.println("Kernel.main: System call is GetMapping");
+                        // System.out.println("Kernel.main: System call is GetMapping");
                         // OS.parameters.get(0) is expected to be a virtual page number
                         GetMapping((Integer) OS.parameters.getFirst());
                         OS.retVal = 1;
                     }
                     case AllocateMemory -> {
-                        System.out.println("Kernel.main: System call is AllocateMemory");
+                        // System.out.println("Kernel.main: System call is AllocateMemory");
                         OS.retVal = AllocateMemory((Integer) OS.parameters.getFirst());
                     }
                     case FreeMemory -> {
-                        System.out.println("Kernel.main: System call is FreeMemory");
+                        // System.out.println("Kernel.main: System call is FreeMemory");
                         OS.retVal = FreeMemory((int) OS.parameters.get(0), (int) OS.parameters.get(1));
                     }
                 }
@@ -139,7 +139,7 @@ public class Kernel extends Process implements Device {
             // Once the OS call is processed, hand over control:
             // If a process is scheduled to run, start it.
             if (scheduler.getCurrentlyRunning() != null) {
-                System.out.println("Kernel: Starting " + scheduler.getCurrentlyRunning().userlandProcess.getClass().getSimpleName());
+                // System.out.println("Kernel: Starting " + scheduler.getCurrentlyRunning().userlandProcess.getClass().getSimpleName());
                 scheduler.getCurrentlyRunning().userlandProcess.start();
             }
             this.stop();
@@ -187,7 +187,7 @@ public class Kernel extends Process implements Device {
 
         if (currentProcess == null) {
             // Handle error: No running process? Should not happen if called correctly.
-            System.out.println("Kernel.GetMapping Error: No running process!");
+            System.err.println("Kernel.GetMapping ERROR: No running process!");
             return;
         }
 
@@ -219,7 +219,7 @@ public class Kernel extends Process implements Device {
             Hardware.TLB[randomIndex][0] = virtualPageNum;
             Hardware.TLB[randomIndex][1] = mapping.physicalPageNumber;
 
-            System.out.println("Kernel.GetMapping: Updated TLB[" + randomIndex + "]");
+            // System.out.println("Kernel.GetMapping: Updated TLB[" + randomIndex + "]");
             return;
         }
 
@@ -320,7 +320,7 @@ public class Kernel extends Process implements Device {
         for (int p = 0; p < freeSpace.length; p++) {
             if (freeSpace[p]) {
                 freeSpace[p] = false; // Mark as used
-                System.out.println("Kernel.findFreePhysicalPage: Found free physical page " + p);
+                // System.out.println("Kernel.findFreePhysicalPage: Found free physical page " + p);
                 return p;
             }
         }
@@ -356,8 +356,8 @@ public class Kernel extends Process implements Device {
                     victimMapping = mapping;
                     victimVirtualPage = i;
                     victimPhysicalPage = mapping.physicalPageNumber;
-                    System.out.println("Kernel.performPageSwap: Found victim page: PID " +
-                            victimProcess.pid + " virtual page: " + victimVirtualPage + " physical page: " + victimPhysicalPage);
+                    // System.out.println("Kernel.performPageSwap: Found victim page: PID " +
+                            // victimProcess.pid + " virtual page: " + victimVirtualPage + " physical page: " + victimPhysicalPage);
                     break; // Found page to swap
                 }
             }
@@ -382,7 +382,7 @@ public class Kernel extends Process implements Device {
                 // Check bounds before copying
                 if (physicalAddressStart >= 0 && (physicalAddressStart + PAGE_SIZE) <= Hardware.PhysicalMemory.length) {
                     System.arraycopy(Hardware.PhysicalMemory, physicalAddressStart, pageData, 0, PAGE_SIZE);
-                    System.out.println("Kernel.performPageSwap: Copied data from physical page " + victimPhysicalPage);
+                    // System.out.println("Kernel.performPageSwap: Copied data from physical page " + victimPhysicalPage);
                 } else {
                     System.err.println("Kernel.performPageSwap ERROR: Invalid physical address calculation for victim P" + victimPhysicalPage);
                     continue; // Try another victim
@@ -395,7 +395,7 @@ public class Kernel extends Process implements Device {
 
             // Write the data to the swap file
             long diskOffset = (long)victimMapping.diskPageNumber * PAGE_SIZE;
-            System.out.println("Kernel.performPageSwap: Seeking swap file to offset " + diskOffset);
+            // System.out.println("Kernel.performPageSwap: Seeking swap file to offset " + diskOffset);
             vfs.seek(swapFileId, (int) diskOffset);
             int bytesWritten = vfs.write(swapFileId, pageData);
             if (bytesWritten != PAGE_SIZE) {
@@ -467,7 +467,7 @@ public class Kernel extends Process implements Device {
             // Create new VirtualToPhysicalMapping which defaults to -1 for physical and disk page
             VirtualToPhysicalMapping newMapping = new VirtualToPhysicalMapping();
             currentProcess.pageTable[currentVirtualPage] = newMapping; // Mapping object placed in page table slot
-            System.out.println("Kernel.AllocateMemory: Virtual Page " + currentVirtualPage + " allocated for PID " + currentProcess.pid);
+            // System.out.println("Kernel.AllocateMemory: Virtual Page " + currentVirtualPage + " allocated for PID " + currentProcess.pid);
         }
         System.out.println();
 
@@ -520,7 +520,7 @@ public class Kernel extends Process implements Device {
                     // Ensure physical page index is valid before using it
                     if (physicalPage >= 0 && physicalPage < freeSpace.length) {
                         freeSpace[physicalPage] = true; // Mark physical page as free
-                        System.out.println("Kernel.FreeMemory: Freed physical page " + physicalPage + " for PID " + currentProcess.pid);
+                        // System.out.println("Kernel.FreeMemory: Freed physical page " + physicalPage + " for PID " + currentProcess.pid);
                         // Invalidate TLB entry
                         invalidateTLBEntry(currentVirtualPage);
                     } else {
@@ -529,7 +529,7 @@ public class Kernel extends Process implements Device {
                     }
                 } else {
                     // Page was allocated virtually but is not in physical RAM
-                    System.out.println("Kernel.FreeMemory: Virtual page " + currentVirtualPage + " was mapped virutally but was not in physical memory.");
+                    // System.out.println("Kernel.FreeMemory: Virtual page " + currentVirtualPage + " was mapped virtually but was not in physical memory.");
                 }
 
                 // Remove mapping from page table. Virtual page will no longer be allocated to the process
@@ -551,7 +551,7 @@ public class Kernel extends Process implements Device {
             if (Hardware.TLB[j][0] == virtualPageNum) {
                 Hardware.TLB[j][0] = Hardware.INVALID_PAGE; // invalidate the entry for the current virtual page
                 Hardware.TLB[j][1] = Hardware.INVALID_PAGE; // physical page
-                System.out.println("Kernel: Invalidated TLB entry for virtual page " + virtualPageNum);
+                // System.out.println("Kernel: Invalidated TLB entry for virtual page " + virtualPageNum);
             }
         }
 
@@ -599,13 +599,13 @@ public class Kernel extends Process implements Device {
         PCB receiver = scheduler.getPCB(targetPid);
 
         if (receiver == null) {
-            System.out.println("SendMessage: Recipient with pid " + targetPid + " not found.");
+            // System.out.println("SendMessage: Recipient with pid " + targetPid + " not found.");
             return;
         }
 
         // Add message copy to receivers message queue
         receiver.messageQueue.add(messageCopy);
-        System.out.println("Kernel.SendMessage: Message sent from pid " + senderPid + " to pid " + targetPid);
+        // System.out.println("Kernel.SendMessage: Message sent from pid " + senderPid + " to pid " + targetPid);
 
         // If receiver is waiting for a message, remove it from the waiting map and requeue into runnable queue
         if (waitingForMessage.containsKey(targetPid)) {
@@ -619,7 +619,7 @@ public class Kernel extends Process implements Device {
     // Checks the running process's running message queue and if it's empty it's marked as waiting and the
     // scheduler is invoked to switch process
     private Object WaitForMessage() throws InterruptedException {
-        System.out.println("Kernel.WaitForMessage Entered");
+        // System.out.println("Kernel.WaitForMessage Entered");
         PCB current = scheduler.runningProcess;
         if (current == null) throw new InterruptedException();
 

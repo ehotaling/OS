@@ -6,12 +6,12 @@ public class Hardware {
 
     // Runs when class is loaded, initializes TLB to invalid.
     static {
-        System.out.println("Hardware: Initializing TLB...");
+        // System.out.println("Hardware: Initializing TLB...");
         for (int i = 0; i < TLB.length; i++) {
             TLB[i][0] = INVALID_PAGE; // Invalidate virtual page entry
             TLB[i][1] = INVALID_PAGE; // Invalidate physical page entry
         }
-        System.out.println("Hardware: TLB Initialized.");
+        // System.out.println("Hardware: TLB Initialized.");
     }
 
     // Simulate LOAD instruction. Gets virtual page, gets physical page, checks TLB and returns data

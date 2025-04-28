@@ -51,7 +51,7 @@ public class OS {
         // Yield control to the kernel:
         // If the scheduler has a currently running process, stop that process.
         if (ki.getScheduler() != null && ki.getScheduler().getCurrentlyRunning() != null) {
-            System.out.println("OS.startTheKernel: Stopping " + ki.getScheduler().getCurrentlyRunning().userlandProcess.getClass().getSimpleName() + " for a system call: " + OS.currentCall);
+            // System.out.println("OS.startTheKernel: Stopping " + ki.getScheduler().getCurrentlyRunning().userlandProcess.getClass().getSimpleName() + " for a system call: " + OS.currentCall);
             ki.getScheduler().getCurrentlyRunning().stop();
         }
         waitForRetVal();
@@ -72,7 +72,7 @@ public class OS {
     // This corresponds to the OS bootstrapping and must be done before any other process operations.
     // 'init' is the initial userland process to be created.
     public static void Startup(UserlandProcess init) throws InterruptedException {
-        System.out.println("OS.Startup: Initializing Kernel");
+        // System.out.println("OS.Startup: Initializing Kernel");
         ki = new Kernel();
         // Pass kernel reference to scheduler, which will later manage the PCB (including tracking open device ids)
         ki.getScheduler().setKernel(ki);
@@ -228,7 +228,7 @@ public class OS {
         parameters.clear();
         parameters.add(km);
         currentCall = CallType.SendMessage;
-        System.out.println("OS.SendMessage: " + km);
+        // System.out.println("OS.SendMessage: " + km);
         startTheKernel();
         retVal = null;
     }
